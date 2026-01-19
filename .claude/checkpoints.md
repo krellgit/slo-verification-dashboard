@@ -2,6 +2,64 @@
 
 ---
 
+## SLOVD-003 - 2026-01-19T08:18:42+08:00
+
+**Summary:** GitHub integration + multi-ASIN dashboard with stats
+
+**Goal:** Transform single-ASIN dashboard into multi-ASIN system with GitHub repo integration, aggregated stats, and centralized error pattern analysis
+
+**Status:** Complete
+
+**Changes:**
+1. Added GitHub API service for private repo access with token auth
+2. Built JSON report parser to transform SLO pipeline outputs to VerificationInput format
+3. Created stats aggregation engine for multi-ASIN analysis
+4. Built RepoConfig component for GitHub connection management
+5. Created AsinList component with status badges, sorting, and filtering
+6. Built StatsDashboard showing aggregated metrics, module performance, and top failures
+7. Restructured main page into 4 states: disconnected, loading, error, connected with data
+8. Implemented two-column layout: ASIN list sidebar + selected ASIN detail view
+9. Added click-through navigation from stats dashboard to failing checks
+
+**Files created:**
+1. src/lib/github.ts - GitHub API service (listReports, fetchReport, config management)
+2. src/lib/reportParser.ts - JSON report parser with module-specific transformers
+3. src/lib/statsAggregator.ts - Multi-ASIN stats aggregation (module stats, top failures, ASIN summaries)
+4. src/components/RepoConfig.tsx - GitHub repo connection UI with token/repo/path inputs
+5. src/components/AsinList.tsx - ASIN grid with status badges, sorting, filtering
+6. src/components/StatsDashboard.tsx - Centralized stats view with summary cards and charts
+
+**Files modified:**
+1. src/app/page.tsx - Complete restructure for multi-ASIN workflow
+2. package-lock.json - Dependencies updated
+
+**Commits:**
+None yet - new features ready to commit
+
+**Key decisions:**
+1. Used c-breakout (4 parallel agents) to build GitHub integration, parser, stats, and UI components simultaneously
+2. GitHub token stored in localStorage (client-side only) - acceptable for personal dashboards
+3. Report parser handles field name variations from SLO pipeline (intent_themes vs intent_themes_processed, etc.)
+4. Stats dashboard shows top 10 failing checks with sample issue reasons for error pattern analysis
+5. ASIN extraction from filename via regex pattern (B0XXXXXXXXX) as fallback if not in JSON
+6. Auto-select first ASIN on connect, auto-select first failing module when viewing ASIN
+7. Real-time verification runs on connect (fetch → parse → verify → aggregate) - no pre-computed results
+8. Type mismatches between agents resolved via adapter layer in page.tsx
+
+**Blockers:** None
+
+**Next steps:**
+1. Commit the new GitHub integration features
+2. Test with real private repo containing SLO JSON reports
+3. Add refresh button to reload reports without reconnecting
+4. Add export functionality (CSV/JSON) for aggregated stats
+5. Consider adding historical tracking (save verification runs over time)
+6. Deploy to Vercel with environment variable for GitHub token
+7. Add rate limit handling UI (show remaining API calls)
+8. Optimize: cache parsed reports in localStorage to avoid re-fetching
+
+---
+
 ## SLOVD-002 - 2026-01-15T22:15:00+08:00
 
 **Summary:** Built 47-check verification engine + test script
