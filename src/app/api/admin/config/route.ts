@@ -93,8 +93,7 @@ export async function GET() {
         GITHUB_REPO: !!process.env.GITHUB_REPO,
         REPORTS_PATH: !!process.env.REPORTS_PATH,
         ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
-        KV_REST_API_URL: !!process.env.KV_REST_API_URL,
-        KV_REST_API_TOKEN: !!process.env.KV_REST_API_TOKEN,
+        REDIS_URL: !!(process.env.slovd_config_REDIS_URL || process.env.REDIS_URL || process.env.KV_URL),
       },
     });
   } catch (error) {

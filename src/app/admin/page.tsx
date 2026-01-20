@@ -22,8 +22,7 @@ interface ConfigStatus {
     GITHUB_REPO: boolean;
     REPORTS_PATH: boolean;
     ADMIN_PASSWORD: boolean;
-    KV_REST_API_URL: boolean;
-    KV_REST_API_TOKEN: boolean;
+    REDIS_URL: boolean;
   };
 }
 
@@ -173,7 +172,7 @@ export default function AdminPage() {
   };
 
   const clearConfiguration = async () => {
-    if (!confirm('Are you sure you want to clear the KV configuration? This will revert to environment variables.')) {
+    if (!confirm('Are you sure you want to clear the Redis configuration? This will revert to environment variables.')) {
       return;
     }
 
@@ -333,7 +332,7 @@ export default function AdminPage() {
                       disabled={saveLoading}
                       className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors disabled:opacity-50"
                     >
-                      Clear KV Config
+                      Clear Redis Config
                     </button>
                   )}
                 </>
@@ -351,7 +350,7 @@ export default function AdminPage() {
           {/* KV Availability Warning */}
           {configStatus && !configStatus.kvAvailable && (
             <div className="mb-4 p-3 bg-yellow-900 text-yellow-300 rounded text-sm">
-              Vercel KV is not configured. Dynamic configuration is not available. Please set KV_REST_API_URL and KV_REST_API_TOKEN environment variables.
+              Redis is not configured. Dynamic configuration is not available. Please create a Redis database in Vercel Storage.
             </div>
           )}
 
@@ -460,7 +459,7 @@ export default function AdminPage() {
                     }`}
                   >
                     {configStatus.source === 'kv'
-                      ? 'Vercel KV (Dynamic)'
+                      ? 'Redis (Dynamic)'
                       : configStatus.source === 'env'
                       ? 'Environment Variables (Static)'
                       : 'Not Configured'}
@@ -599,10 +598,10 @@ export default function AdminPage() {
             <div>
               <h3 className="text-white font-semibold mb-2">Option 1: Dynamic Configuration (Recommended)</h3>
               <p className="mb-2">
-                Use Vercel KV for dynamic configuration that can be changed without redeployment:
+                Use Vercel Redis for dynamic configuration that can be changed without redeployment:
               </p>
               <ol className="list-decimal list-inside space-y-1 text-gray-400">
-                <li>Set up Vercel KV in your project (KV_REST_API_URL and KV_REST_API_TOKEN are auto-configured)</li>
+                <li>Create a Redis database in Vercel Storage (REDIS_URL is auto-configured)</li>
                 <li>Set ADMIN_PASSWORD environment variable</li>
                 <li>Use the "Edit Configuration" button above to configure GitHub connection</li>
                 <li>Changes take effect immediately without redeployment</li>

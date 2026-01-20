@@ -1,10 +1,44 @@
 // Vercel KV storage for dynamic GitHub configuration
 // Server-side only
 
-import { kv } from '@vercel/kv';
+import Redis from 'ioredis';
 import { GitHubConfig } from './github';
 
 const KV_CONFIG_KEY = 'slovd:github_config';
+
+// Create Redis client using the connection URL
+let redis: Redis | null = null;
+
+function getRedisClient(): Redis | null {
+  if (redis) return redis;
+
+  const redisUrl = process.env.slovd_config_REDIS_URL || process.env.REDIS_URL || process.env.KV_URL;
+
+  if (!redisUrl) {
+    return null;
+  }
+
+  try {
+    redis = new Redis(redisUrl, {
+      // Disable retries for faster failure detection
+      retryStrategy: () => null,
+      // Set connection timeout
+      connectTimeout: 5000,
+      // Lazy connect - only connect when first command is issued
+      lazyConnect: true,
+    });
+
+    // Handle connection errors
+    redis.on('error', (err) => {
+      console.error('Redis connection error:', err);
+    });
+
+    return redis;
+  } catch (error) {
+    console.error('Failed to create Redis client:', error);
+    return null;
+  }
+}
 
 export interface StoredConfig {
   config: GitHubConfig;
@@ -24,7 +58,11 @@ export interface ValidationError {
  * Check if Vercel KV is available (env vars set)
  */
 export function isKVAvailable(): boolean {
-  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+  return !!(
+    process.env.slovd_config_REDIS_URL ||
+    process.env.REDIS_URL ||
+    process.env.KV_URL
+  );
 }
 
 /**
@@ -79,7 +117,9 @@ export async function saveConfigToKV(
   config: GitHubConfig,
   updatedBy?: string
 ): Promise<void> {
-  if (!isKVAvailable()) {
+  const client = getRedisClient();
+
+  if (!client || !isKVAvailable()) {
     throw new Error('Vercel KV is not configured');
   }
 
@@ -103,23 +143,43 @@ export async function saveConfigToKV(
     },
   };
 
-  await kv.set(KV_CONFIG_KEY, storedConfig);
+  try {
+    // Ensure client is connected
+    if (client.status !== 'ready') {
+      await client.connect();
+    }
+
+    // Store as JSON string in Redis
+    await client.set(KV_CONFIG_KEY, JSON.stringify(storedConfig));
+  } catch (error) {
+    console.error('Error saving to Redis:', error);
+    throw new Error('Failed to save configuration to KV store');
+  }
 }
 
 /**
  * Get configuration from Vercel KV
  */
 export async function getConfigFromKV(): Promise<GitHubConfig | null> {
-  if (!isKVAvailable()) {
+  const client = getRedisClient();
+
+  if (!client || !isKVAvailable()) {
     return null;
   }
 
   try {
-    const stored = await kv.get<StoredConfig>(KV_CONFIG_KEY);
-    if (!stored) {
+    // Ensure client is connected
+    if (client.status !== 'ready') {
+      await client.connect();
+    }
+
+    const data = await client.get(KV_CONFIG_KEY);
+
+    if (!data) {
       return null;
     }
 
+    const stored: StoredConfig = JSON.parse(data);
     return stored.config;
   } catch (error) {
     console.error('Error fetching config from KV:', error);
@@ -131,16 +191,25 @@ export async function getConfigFromKV(): Promise<GitHubConfig | null> {
  * Get configuration metadata (without exposing token)
  */
 export async function getConfigMetadata(): Promise<StoredConfig['metadata'] | null> {
-  if (!isKVAvailable()) {
+  const client = getRedisClient();
+
+  if (!client || !isKVAvailable()) {
     return null;
   }
 
   try {
-    const stored = await kv.get<StoredConfig>(KV_CONFIG_KEY);
-    if (!stored) {
+    // Ensure client is connected
+    if (client.status !== 'ready') {
+      await client.connect();
+    }
+
+    const data = await client.get(KV_CONFIG_KEY);
+
+    if (!data) {
       return null;
     }
 
+    const stored: StoredConfig = JSON.parse(data);
     return stored.metadata;
   } catch (error) {
     console.error('Error fetching config metadata from KV:', error);
@@ -152,9 +221,21 @@ export async function getConfigMetadata(): Promise<StoredConfig['metadata'] | nu
  * Delete configuration from Vercel KV
  */
 export async function deleteConfigFromKV(): Promise<void> {
-  if (!isKVAvailable()) {
+  const client = getRedisClient();
+
+  if (!client || !isKVAvailable()) {
     throw new Error('Vercel KV is not configured');
   }
 
-  await kv.del(KV_CONFIG_KEY);
+  try {
+    // Ensure client is connected
+    if (client.status !== 'ready') {
+      await client.connect();
+    }
+
+    await client.del(KV_CONFIG_KEY);
+  } catch (error) {
+    console.error('Error deleting config from KV:', error);
+    throw new Error('Failed to delete configuration from KV store');
+  }
 }
