@@ -68,6 +68,12 @@ export function getAdminPassword(): string | null {
  */
 export function verifyAdminPassword(password: string): boolean {
   const adminPassword = getAdminPassword();
+  console.log('[DEBUG] Admin password check:', {
+    hasAdminPassword: !!adminPassword,
+    adminPasswordLength: adminPassword?.length,
+    inputPasswordLength: password.length,
+    match: password === adminPassword,
+  });
   if (!adminPassword) {
     return false;
   }
