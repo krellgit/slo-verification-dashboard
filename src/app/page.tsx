@@ -5,106 +5,97 @@ import { ModuleDetail } from '@/components/ModuleDetail';
 import { PipelineView } from '@/components/PipelineView';
 import { StatsDashboard } from '@/components/StatsDashboard';
 import { VerificationResult } from '@/lib/types';
-
-// Components
-import { RepoConfig } from '@/components/RepoConfig';
 import { AsinList, AsinSummary } from '@/components/AsinList';
 
-// Lib functions
-import { listReports, fetchReport, ReportFile, GitHubConfig } from '@/lib/github';
-import { parseReport } from '@/lib/reportParser';
-import { verify } from '@/lib/verificationEngine';
-import { aggregateStats, AggregatedStats } from '@/lib/statsAggregator';
+type LoadingState = 'loading' | 'loaded' | 'error' | 'not_configured';
 
-type LoadingState = 'idle' | 'loading' | 'loaded' | 'error';
-
-interface ReportWithResult {
-  report: ReportFile;
-  result: VerificationResult | null;
+interface ReportsResponse {
+  configured: boolean;
+  reports?: VerificationResult[];
+  stats?: {
+    totalAsins: number;
+    passedAsins: number;
+    failedAsins: number;
+    reviewAsins: number;
+    totalChecks: number;
+    passedChecks: number;
+    failedChecks: number;
+    reviewChecks: number;
+    moduleStats: Record<string, {
+      name: string;
+      totalRuns: number;
+      passCount: number;
+      failCount: number;
+      passRate: number;
+    }>;
+    topFailures: Array<{
+      checkId: string;
+      checkName: string;
+      failCount: number;
+      sampleIssues: string[];
+    }>;
+  };
   error?: string;
+  meta?: {
+    totalFiles: number;
+    processedFiles: number;
+    failedFiles: number;
+    timestamp: string;
+  };
 }
 
 export default function Dashboard() {
-  // GitHub configuration state
-  const [githubConfig, setGithubConfig] = useState<GitHubConfig | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-
   // Data state
-  const [reports, setReports] = useState<ReportFile[]>([]);
-  const [reportResults, setReportResults] = useState<Map<string, ReportWithResult>>(new Map());
-  const [aggregatedStats, setAggregatedStats] = useState<AggregatedStats | null>(null);
+  const [reports, setReports] = useState<VerificationResult[]>([]);
+  const [stats, setStats] = useState<ReportsResponse['stats'] | null>(null);
 
   // UI state
-  const [loadingState, setLoadingState] = useState<LoadingState>('idle');
+  const [loadingState, setLoadingState] = useState<LoadingState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedAsin, setSelectedAsin] = useState<string | null>(null);
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
-  // Handle GitHub connection
-  const handleConnect = useCallback(async (config: GitHubConfig) => {
-    setGithubConfig(config);
+  // Fetch reports from server
+  const fetchReports = useCallback(async () => {
     setLoadingState('loading');
     setErrorMessage(null);
 
     try {
-      // Fetch list of reports from GitHub
-      const reportList = await listReports(config);
-      setReports(reportList);
+      const res = await fetch('/api/reports');
+      const data: ReportsResponse = await res.json();
 
-      // Fetch and parse each report
-      const resultsMap = new Map<string, ReportWithResult>();
-      const verificationResults: VerificationResult[] = [];
-
-      for (const report of reportList) {
-        try {
-          const content = await fetchReport(report.path, config);
-          const parsed = parseReport(content, report.asin);
-          const verified = verify(parsed);
-          resultsMap.set(report.asin, { report, result: verified });
-          verificationResults.push(verified);
-        } catch (err) {
-          resultsMap.set(report.asin, {
-            report,
-            result: null,
-            error: err instanceof Error ? err.message : 'Failed to parse report'
-          });
-        }
+      if (!data.configured) {
+        setLoadingState('not_configured');
+        setErrorMessage(data.error || 'Dashboard not configured');
+        return;
       }
 
-      setReportResults(resultsMap);
-
-      // Aggregate stats across all reports
-      if (verificationResults.length > 0) {
-        const stats = aggregateStats(verificationResults);
-        setAggregatedStats(stats);
+      if (data.error) {
+        setLoadingState('error');
+        setErrorMessage(data.error);
+        return;
       }
 
-      setIsConnected(true);
+      setReports(data.reports || []);
+      setStats(data.stats || null);
+      setLastUpdated(data.meta?.timestamp || new Date().toISOString());
       setLoadingState('loaded');
 
       // Auto-select first ASIN if available
-      if (reportList.length > 0) {
-        setSelectedAsin(reportList[0].asin);
+      if (data.reports && data.reports.length > 0 && !selectedAsin) {
+        setSelectedAsin(data.reports[0].product.asin);
       }
     } catch (err) {
       setLoadingState('error');
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to connect to repository');
-      setIsConnected(false);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to fetch reports');
     }
-  }, []);
+  }, [selectedAsin]);
 
-  // Handle disconnect
-  const handleDisconnect = useCallback(() => {
-    setGithubConfig(null);
-    setIsConnected(false);
-    setReports([]);
-    setReportResults(new Map());
-    setAggregatedStats(null);
-    setSelectedAsin(null);
-    setSelectedModule(null);
-    setLoadingState('idle');
-    setErrorMessage(null);
-  }, []);
+  // Fetch on mount
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
 
   // Handle ASIN selection
   const handleAsinSelect = useCallback((asin: string) => {
@@ -112,61 +103,44 @@ export default function Dashboard() {
     setSelectedModule(null);
 
     // Auto-select first failing module if any
-    const reportData = reportResults.get(asin);
-    if (reportData?.result) {
-      const failingModule = reportData.result.modules.find(
+    const report = reports.find(r => r.product.asin === asin);
+    if (report) {
+      const failingModule = report.modules.find(
         (m) => m.status === 'FAIL' || m.status === 'REVIEW_NEEDED'
       );
       if (failingModule) {
         setSelectedModule(failingModule.id);
-      } else if (reportData.result.modules.length > 0) {
-        setSelectedModule(reportData.result.modules[0].id);
+      } else if (report.modules.length > 0) {
+        setSelectedModule(report.modules[0].id);
       }
     }
-  }, [reportResults]);
+  }, [reports]);
 
   // Handle check click from stats dashboard
   const handleCheckClick = useCallback((checkId: string) => {
-    // Extract module ID from check ID (e.g., "M1-01" -> "M1")
     const moduleId = checkId.split('-')[0];
 
-    // Find which ASIN has this failing check
-    for (const [asin, data] of reportResults.entries()) {
-      if (data.result) {
-        const module = data.result.modules.find(m => m.id === moduleId);
-        if (module) {
-          const check = module.checks.find(c => c.id === checkId && c.status === 'FAIL');
-          if (check) {
-            setSelectedAsin(asin);
-            setSelectedModule(moduleId);
-            return;
-          }
+    for (const report of reports) {
+      const module = report.modules.find(m => m.id === moduleId);
+      if (module) {
+        const check = module.checks.find(c => c.id === checkId && c.status === 'FAIL');
+        if (check) {
+          setSelectedAsin(report.product.asin);
+          setSelectedModule(moduleId);
+          return;
         }
       }
     }
-  }, [reportResults]);
+  }, [reports]);
 
   // Get current selected result
-  const selectedResult = selectedAsin ? reportResults.get(selectedAsin)?.result : null;
+  const selectedResult = selectedAsin
+    ? reports.find(r => r.product.asin === selectedAsin)
+    : null;
   const selectedModuleData = selectedResult?.modules.find(m => m.id === selectedModule);
 
-  // Convert reports to AsinSummary format for AsinList
-  const asinSummaries: AsinSummary[] = reports.map(report => {
-    const data = reportResults.get(report.asin);
-    if (!data?.result) {
-      return {
-        asin: report.asin,
-        productName: report.name,
-        status: 'FAIL' as const,
-        passRate: 0,
-        totalChecks: 0,
-        passedChecks: 0,
-        failedChecks: 0,
-        reviewChecks: 0,
-      };
-    }
-
-    const result = data.result;
+  // Convert reports to AsinSummary format
+  const asinSummaries: AsinSummary[] = reports.map(result => {
     const hasFailed = result.summary.failed > 0;
     const hasReview = result.summary.review > 0;
 
@@ -176,7 +150,7 @@ export default function Dashboard() {
     else status = 'PASS';
 
     return {
-      asin: report.asin,
+      asin: result.product.asin,
       productName: result.product.name,
       status,
       passRate: result.summary.totalChecks > 0
@@ -189,26 +163,26 @@ export default function Dashboard() {
     };
   });
 
-  // Convert aggregatedStats to StatsDashboard format
-  const dashboardStats = aggregatedStats ? {
-    totalAsins: aggregatedStats.totalAsins,
-    totalChecks: aggregatedStats.totalChecks,
-    totalPassed: aggregatedStats.passedChecks,
-    totalFailed: aggregatedStats.failedChecks,
-    totalReview: aggregatedStats.reviewChecks,
-    overallPassRate: aggregatedStats.totalChecks > 0
-      ? Math.round((aggregatedStats.passedChecks / aggregatedStats.totalChecks) * 100)
+  // Convert stats to dashboard format
+  const dashboardStats = stats ? {
+    totalAsins: stats.totalAsins,
+    totalChecks: stats.totalChecks,
+    totalPassed: stats.passedChecks,
+    totalFailed: stats.failedChecks,
+    totalReview: stats.reviewChecks,
+    overallPassRate: stats.totalChecks > 0
+      ? Math.round((stats.passedChecks / stats.totalChecks) * 100)
       : 0,
-    moduleStats: Object.entries(aggregatedStats.moduleStats).map(([moduleId, stats]) => ({
+    moduleStats: Object.entries(stats.moduleStats).map(([moduleId, modStats]) => ({
       moduleId,
-      moduleName: stats.name,
-      totalChecks: stats.totalRuns,
-      passed: stats.passCount,
-      failed: stats.failCount,
+      moduleName: modStats.name,
+      totalChecks: modStats.totalRuns,
+      passed: modStats.passCount,
+      failed: modStats.failCount,
       review: 0,
-      passRate: stats.passRate,
+      passRate: modStats.passRate,
     })),
-    topFailingChecks: aggregatedStats.topFailures.map(f => ({
+    topFailingChecks: stats.topFailures.map(f => ({
       checkId: f.checkId,
       checkName: f.checkName,
       moduleId: f.checkId.split('-')[0],
@@ -219,7 +193,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Header with Repo Config */}
+      {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -228,60 +202,56 @@ export default function Dashboard() {
                 SLO Verification Dashboard
               </h1>
               <p className="text-sm text-gray-500">
-                {isConnected
-                  ? `Connected to ${githubConfig?.owner}/${githubConfig?.repo}`
-                  : 'Connect a GitHub repository to get started'}
+                {loadingState === 'loaded' && reports.length > 0
+                  ? `${reports.length} ASINs loaded`
+                  : loadingState === 'loading'
+                  ? 'Loading...'
+                  : 'Verification results'}
               </p>
             </div>
-            <RepoConfig
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-              isConnected={isConnected}
-              isLoading={loadingState === 'loading'}
-              error={errorMessage || undefined}
-            />
+            <div className="flex items-center gap-4">
+              {loadingState === 'loaded' && (
+                <button
+                  onClick={fetchReports}
+                  className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                >
+                  Refresh
+                </button>
+              )}
+              <a
+                href="/admin"
+                className="px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
+              >
+                Admin
+              </a>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="flex-1">
-        {/* Disconnected State - Welcome/Instructions */}
-        {!isConnected && loadingState !== 'loading' && (
+        {/* Not Configured State */}
+        {loadingState === 'not_configured' && (
           <div className="max-w-7xl mx-auto px-4 py-12">
             <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                 </svg>
               </div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                Welcome to SLO Verification Dashboard
+                Dashboard Not Configured
               </h2>
               <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                Connect your GitHub repository containing verification reports to view aggregated
-                statistics and detailed results for each ASIN.
+                The administrator needs to configure the GitHub repository connection
+                before verification results can be displayed.
               </p>
-              <div className="bg-gray-50 rounded-lg p-4 text-left max-w-md mx-auto">
-                <h3 className="font-medium text-gray-900 mb-2">Getting Started:</h3>
-                <ol className="text-sm text-gray-600 space-y-2">
-                  <li className="flex items-start gap-2">
-                    <span className="font-mono bg-gray-200 text-gray-700 rounded px-1.5 py-0.5 text-xs">1</span>
-                    <span>Click the &quot;Connect Repository&quot; button above</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-mono bg-gray-200 text-gray-700 rounded px-1.5 py-0.5 text-xs">2</span>
-                    <span>Enter your GitHub repo details (owner/repo)</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-mono bg-gray-200 text-gray-700 rounded px-1.5 py-0.5 text-xs">3</span>
-                    <span>Provide a GitHub token with read access</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-mono bg-gray-200 text-gray-700 rounded px-1.5 py-0.5 text-xs">4</span>
-                    <span>View aggregated stats and per-ASIN results</span>
-                  </li>
-                </ol>
-              </div>
+              <a
+                href="/admin"
+                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Go to Admin Panel
+              </a>
             </div>
           </div>
         )}
@@ -306,21 +276,21 @@ export default function Dashboard() {
                 </svg>
               </div>
               <h2 className="text-xl font-semibold text-red-800 mb-2">
-                Connection Failed
+                Error Loading Reports
               </h2>
               <p className="text-red-600 mb-4">{errorMessage}</p>
               <button
-                onClick={handleDisconnect}
+                onClick={fetchReports}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
-                Try Again
+                Retry
               </button>
             </div>
           </div>
         )}
 
-        {/* Connected State with Data */}
-        {isConnected && loadingState === 'loaded' && reports.length > 0 && (
+        {/* Loaded State with Data */}
+        {loadingState === 'loaded' && reports.length > 0 && (
           <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
             {/* Stats Dashboard */}
             {dashboardStats && (
@@ -425,10 +395,7 @@ export default function Dashboard() {
                 {selectedAsin && !selectedResult && (
                   <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-8 text-center">
                     <p className="text-yellow-700">
-                      Failed to load verification data for this ASIN.
-                    </p>
-                    <p className="text-sm text-yellow-600 mt-1">
-                      {reportResults.get(selectedAsin)?.error || 'Unknown error'}
+                      No verification data available for this ASIN.
                     </p>
                   </div>
                 )}
@@ -437,8 +404,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Empty State - Connected but no reports */}
-        {isConnected && loadingState === 'loaded' && reports.length === 0 && (
+        {/* Empty State - No reports */}
+        {loadingState === 'loaded' && reports.length === 0 && (
           <div className="max-w-7xl mx-auto px-4 py-12">
             <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
               <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -450,13 +417,13 @@ export default function Dashboard() {
                 No Reports Found
               </h2>
               <p className="text-gray-600 mb-4">
-                The connected repository does not contain any JSON reports in the specified path.
+                The configured repository does not contain any JSON reports yet.
               </p>
               <button
-                onClick={handleDisconnect}
+                onClick={fetchReports}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
               >
-                Disconnect
+                Refresh
               </button>
             </div>
           </div>
@@ -467,8 +434,8 @@ export default function Dashboard() {
       <footer className="bg-white border-t border-gray-200 mt-auto">
         <div className="max-w-7xl mx-auto px-4 py-4 text-center text-sm text-gray-500">
           SLO Verification Dashboard
-          {selectedResult && (
-            <span> | Run ID: {selectedResult.runId} | {selectedResult.timestamp}</span>
+          {lastUpdated && (
+            <span> | Last updated: {new Date(lastUpdated).toLocaleString()}</span>
           )}
         </div>
       </footer>
