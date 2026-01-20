@@ -15,13 +15,13 @@ export const revalidate = 0;
  */
 export async function GET() {
   try {
-    const config = getServerConfig();
+    const config = await getServerConfig();
 
     if (!config) {
-      const status = getConfigStatus();
+      const status = await getConfigStatus();
       return NextResponse.json({
         configured: false,
-        error: 'GitHub repository not configured. Admin must set environment variables.',
+        error: 'GitHub repository not configured. Admin must configure GitHub connection.',
         status,
       }, { status: 503 });
     }

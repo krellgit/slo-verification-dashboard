@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { getServerConfig, getConfigStatus } from '@/lib/serverConfig';
-import { validateConfig, checkRateLimit, listReports } from '@/lib/github';
+import { getServerConfig, getConfigStatus, checkKVAvailability } from '@/lib/serverConfig';
+import { validateConfig, checkRateLimit, listReports, GitHubConfig } from '@/lib/github';
+import { saveConfigToKV, deleteConfigFromKV, validateConfigInput } from '@/lib/kvConfig';
 
 const SESSION_COOKIE = 'slovd_admin_session';
 
@@ -39,8 +40,9 @@ export async function GET() {
   }
 
   try {
-    const status = getConfigStatus();
-    const config = getServerConfig();
+    const status = await getConfigStatus();
+    const config = await getServerConfig();
+    const kvAvailable = checkKVAvailability();
 
     let connectionStatus: 'connected' | 'error' | 'not_configured' = 'not_configured';
     let connectionError: string | undefined;
@@ -85,11 +87,14 @@ export async function GET() {
       connectionError,
       rateLimit,
       reportCount,
+      kvAvailable,
       envVarsConfigured: {
         GITHUB_TOKEN: !!process.env.GITHUB_TOKEN,
         GITHUB_REPO: !!process.env.GITHUB_REPO,
         REPORTS_PATH: !!process.env.REPORTS_PATH,
         ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
+        KV_REST_API_URL: !!process.env.KV_REST_API_URL,
+        KV_REST_API_TOKEN: !!process.env.KV_REST_API_TOKEN,
       },
     });
   } catch (error) {
@@ -102,9 +107,9 @@ export async function GET() {
 }
 
 /**
- * POST /api/admin/config/test - Test connection (protected)
+ * POST /api/admin/config - Test or save configuration (protected)
  */
-export async function POST() {
+export async function POST(request: Request) {
   // Check authentication
   if (!(await isAuthenticated())) {
     return NextResponse.json(
@@ -114,34 +119,128 @@ export async function POST() {
   }
 
   try {
-    const config = getServerConfig();
+    const body = await request.json();
+    const { action, owner, repo, path, token } = body;
 
-    if (!config) {
+    // Handle test action (existing functionality)
+    if (action === 'test' || !action) {
+      const config = await getServerConfig();
+
+      if (!config) {
+        return NextResponse.json({
+          success: false,
+          error: 'GitHub configuration not set. Please configure environment variables.',
+        });
+      }
+
+      const validation = await validateConfig(config);
+
+      if (!validation.valid) {
+        return NextResponse.json({
+          success: false,
+          error: validation.error,
+        });
+      }
+
+      // Also try to list reports
+      const reports = await listReports(config);
+
       return NextResponse.json({
-        success: false,
-        error: 'GitHub configuration not set. Please configure environment variables.',
+        success: true,
+        reportCount: reports.length,
+        reports: reports.slice(0, 5).map(r => ({ asin: r.asin, name: r.name })),
       });
     }
 
-    const validation = await validateConfig(config);
+    // Handle save action (new functionality)
+    if (action === 'save') {
+      // Check if KV is available
+      if (!checkKVAvailability()) {
+        return NextResponse.json({
+          success: false,
+          error: 'Vercel KV is not configured. Please set KV_REST_API_URL and KV_REST_API_TOKEN environment variables.',
+        });
+      }
 
-    if (!validation.valid) {
+      // Validate input
+      const validation = validateConfigInput({ owner, repo, token, path });
+      if (!validation.valid) {
+        return NextResponse.json({
+          success: false,
+          error: validation.errors[0].message,
+          validationErrors: validation.errors,
+        });
+      }
+
+      // Create config object
+      const newConfig: GitHubConfig = {
+        owner: owner.trim(),
+        repo: repo.trim(),
+        token: token.trim(),
+        path: path?.trim() || 'reports',
+      };
+
+      // Test connection first
+      const connectionValidation = await validateConfig(newConfig);
+      if (!connectionValidation.valid) {
+        return NextResponse.json({
+          success: false,
+          error: `Connection test failed: ${connectionValidation.error}`,
+        });
+      }
+
+      // Save to KV
+      await saveConfigToKV(newConfig, 'admin');
+
       return NextResponse.json({
-        success: false,
-        error: validation.error,
+        success: true,
+        message: 'Configuration saved successfully',
       });
     }
 
-    // Also try to list reports
-    const reports = await listReports(config);
+    return NextResponse.json({
+      success: false,
+      error: 'Invalid action. Use "test" or "save".',
+    });
+  } catch (error) {
+    console.error('Config API error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * DELETE /api/admin/config - Clear KV configuration (protected)
+ */
+export async function DELETE() {
+  // Check authentication
+  if (!(await isAuthenticated())) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+
+  try {
+    // Check if KV is available
+    if (!checkKVAvailability()) {
+      return NextResponse.json({
+        success: false,
+        error: 'Vercel KV is not configured.',
+      });
+    }
+
+    // Delete config from KV
+    await deleteConfigFromKV();
 
     return NextResponse.json({
       success: true,
-      reportCount: reports.length,
-      reports: reports.slice(0, 5).map(r => ({ asin: r.asin, name: r.name })),
+      message: 'Configuration cleared. Falling back to environment variables.',
     });
   } catch (error) {
-    console.error('Config test error:', error);
+    console.error('Config delete error:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

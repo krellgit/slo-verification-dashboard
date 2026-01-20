@@ -1,13 +1,13 @@
-// Server-side configuration from environment variables
+// Server-side configuration from Vercel KV or environment variables
 // This file should only be imported in server components or API routes
 
 import { GitHubConfig } from './github';
+import { getConfigFromKV, isKVAvailable } from './kvConfig';
 
 /**
- * Get GitHub configuration from environment variables
- * For server-side use only
+ * Get GitHub configuration from environment variables (fallback)
  */
-export function getServerConfig(): GitHubConfig | null {
+function getConfigFromEnv(): GitHubConfig | null {
   const token = process.env.GITHUB_TOKEN;
   const repo = process.env.GITHUB_REPO; // format: "owner/repo"
   const path = process.env.REPORTS_PATH || 'reports';
@@ -32,10 +32,28 @@ export function getServerConfig(): GitHubConfig | null {
 }
 
 /**
+ * Get GitHub configuration with priority: KV store → environment variables
+ * For server-side use only
+ */
+export async function getServerConfig(): Promise<GitHubConfig | null> {
+  // Try KV store first
+  if (isKVAvailable()) {
+    const kvConfig = await getConfigFromKV();
+    if (kvConfig) {
+      return kvConfig;
+    }
+  }
+
+  // Fallback to environment variables
+  return getConfigFromEnv();
+}
+
+/**
  * Check if server config is available
  */
-export function hasServerConfig(): boolean {
-  return getServerConfig() !== null;
+export async function hasServerConfig(): Promise<boolean> {
+  const config = await getServerConfig();
+  return config !== null;
 }
 
 /**
@@ -59,19 +77,49 @@ export function verifyAdminPassword(password: string): boolean {
 /**
  * Get config status for display (without exposing token)
  */
-export function getConfigStatus(): {
+export async function getConfigStatus(): Promise<{
   configured: boolean;
+  source?: 'kv' | 'env' | 'none';
   repo?: string;
   path?: string;
-} {
-  const config = getServerConfig();
-  if (!config) {
-    return { configured: false };
+  updatedAt?: string;
+}> {
+  // Check KV first
+  if (isKVAvailable()) {
+    const kvConfig = await getConfigFromKV();
+    if (kvConfig) {
+      const { getConfigMetadata } = await import('./kvConfig');
+      const metadata = await getConfigMetadata();
+      return {
+        configured: true,
+        source: 'kv',
+        repo: `${kvConfig.owner}/${kvConfig.repo}`,
+        path: kvConfig.path,
+        updatedAt: metadata?.updatedAt,
+      };
+    }
+  }
+
+  // Check environment variables
+  const envConfig = getConfigFromEnv();
+  if (envConfig) {
+    return {
+      configured: true,
+      source: 'env',
+      repo: `${envConfig.owner}/${envConfig.repo}`,
+      path: envConfig.path,
+    };
   }
 
   return {
-    configured: true,
-    repo: `${config.owner}/${config.repo}`,
-    path: config.path,
+    configured: false,
+    source: 'none',
   };
+}
+
+/**
+ * Check if Vercel KV is available
+ */
+export function checkKVAvailability(): boolean {
+  return isKVAvailable();
 }

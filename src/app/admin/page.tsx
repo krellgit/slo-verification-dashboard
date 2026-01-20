@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 
 interface ConfigStatus {
   configured: boolean;
+  source?: 'kv' | 'env' | 'none';
   repo?: string;
   path?: string;
+  updatedAt?: string;
   connectionStatus: 'connected' | 'error' | 'not_configured';
   connectionError?: string;
   rateLimit?: {
@@ -14,11 +16,14 @@ interface ConfigStatus {
     resetAt: string;
   };
   reportCount?: number;
+  kvAvailable?: boolean;
   envVarsConfigured: {
     GITHUB_TOKEN: boolean;
     GITHUB_REPO: boolean;
     REPORTS_PATH: boolean;
     ADMIN_PASSWORD: boolean;
+    KV_REST_API_URL: boolean;
+    KV_REST_API_TOKEN: boolean;
   };
 }
 
@@ -39,6 +44,17 @@ export default function AdminPage() {
   const [configLoading, setConfigLoading] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testLoading, setTestLoading] = useState(false);
+
+  // Edit mode state
+  const [editMode, setEditMode] = useState(false);
+  const [formData, setFormData] = useState({
+    owner: '',
+    repo: '',
+    path: 'reports',
+    token: '',
+  });
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveResult, setSaveResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Check authentication status on mount
   useEffect(() => {
@@ -125,6 +141,88 @@ export default function AdminPage() {
     } finally {
       setTestLoading(false);
     }
+  };
+
+  const saveConfiguration = async () => {
+    setSaveLoading(true);
+    setSaveResult(null);
+    try {
+      const res = await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save',
+          ...formData,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setSaveResult({ success: true, message: data.message });
+        setEditMode(false);
+        fetchConfigStatus();
+      } else {
+        setSaveResult({ success: false, message: data.error || 'Save failed' });
+      }
+    } catch {
+      setSaveResult({ success: false, message: 'Connection error' });
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const clearConfiguration = async () => {
+    if (!confirm('Are you sure you want to clear the KV configuration? This will revert to environment variables.')) {
+      return;
+    }
+
+    setSaveLoading(true);
+    setSaveResult(null);
+    try {
+      const res = await fetch('/api/admin/config', {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setSaveResult({ success: true, message: data.message });
+        fetchConfigStatus();
+      } else {
+        setSaveResult({ success: false, message: data.error || 'Clear failed' });
+      }
+    } catch {
+      setSaveResult({ success: false, message: 'Connection error' });
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleEditClick = () => {
+    // Parse current repo into owner/repo if available
+    if (configStatus?.repo) {
+      const [owner, repo] = configStatus.repo.split('/');
+      setFormData({
+        owner: owner || '',
+        repo: repo || '',
+        path: configStatus.path || 'reports',
+        token: '',
+      });
+    }
+    setEditMode(true);
+    setSaveResult(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditMode(false);
+    setSaveResult(null);
+    setFormData({
+      owner: '',
+      repo: '',
+      path: 'reports',
+      token: '',
+    });
   };
 
   // Fetch config status when authenticated
@@ -218,18 +316,168 @@ export default function AdminPage() {
         {/* Configuration Status */}
         <div className="bg-gray-800 rounded-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Configuration Status</h2>
-            <button
-              onClick={fetchConfigStatus}
-              disabled={configLoading}
-              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors disabled:opacity-50"
-            >
-              {configLoading ? 'Refreshing...' : 'Refresh'}
-            </button>
+            <h2 className="text-lg font-semibold text-white">GitHub Configuration</h2>
+            <div className="flex items-center gap-2">
+              {!editMode && configStatus?.kvAvailable && (
+                <>
+                  <button
+                    onClick={handleEditClick}
+                    disabled={configLoading}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors disabled:opacity-50"
+                  >
+                    Edit Configuration
+                  </button>
+                  {configStatus.source === 'kv' && (
+                    <button
+                      onClick={clearConfiguration}
+                      disabled={saveLoading}
+                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors disabled:opacity-50"
+                    >
+                      Clear KV Config
+                    </button>
+                  )}
+                </>
+              )}
+              <button
+                onClick={fetchConfigStatus}
+                disabled={configLoading}
+                className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors disabled:opacity-50"
+              >
+                {configLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
           </div>
 
-          {configStatus ? (
+          {/* KV Availability Warning */}
+          {configStatus && !configStatus.kvAvailable && (
+            <div className="mb-4 p-3 bg-yellow-900 text-yellow-300 rounded text-sm">
+              Vercel KV is not configured. Dynamic configuration is not available. Please set KV_REST_API_URL and KV_REST_API_TOKEN environment variables.
+            </div>
+          )}
+
+          {/* Save Result Message */}
+          {saveResult && (
+            <div
+              className={`mb-4 p-3 rounded text-sm ${
+                saveResult.success
+                  ? 'bg-green-900 text-green-300'
+                  : 'bg-red-900 text-red-300'
+              }`}
+            >
+              {saveResult.message}
+            </div>
+          )}
+
+          {/* Edit Form */}
+          {editMode ? (
             <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Repository Owner
+                </label>
+                <input
+                  type="text"
+                  value={formData.owner}
+                  onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  placeholder="e.g., octocat"
+                  disabled={saveLoading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Repository Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.repo}
+                  onChange={(e) => setFormData({ ...formData, repo: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  placeholder="e.g., hello-world"
+                  disabled={saveLoading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Reports Path (optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.path}
+                  onChange={(e) => setFormData({ ...formData, path: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  placeholder="reports"
+                  disabled={saveLoading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  GitHub Token
+                </label>
+                <input
+                  type="password"
+                  value={formData.token}
+                  onChange={(e) => setFormData({ ...formData, token: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  placeholder="ghp_xxxxxxxxxxxx"
+                  disabled={saveLoading}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-4">
+                <button
+                  onClick={saveConfiguration}
+                  disabled={saveLoading || !formData.owner || !formData.repo || !formData.token}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                >
+                  {saveLoading ? 'Saving...' : 'Save Configuration'}
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  disabled={saveLoading}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : configStatus ? (
+            <div className="space-y-4">
+              {/* Configuration Source */}
+              {configStatus.source && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400">Source:</span>
+                  <span
+                    className={`px-2 py-1 rounded text-sm ${
+                      configStatus.source === 'kv'
+                        ? 'bg-blue-900 text-blue-300'
+                        : configStatus.source === 'env'
+                        ? 'bg-purple-900 text-purple-300'
+                        : 'bg-gray-700 text-gray-300'
+                    }`}
+                  >
+                    {configStatus.source === 'kv'
+                      ? 'Vercel KV (Dynamic)'
+                      : configStatus.source === 'env'
+                      ? 'Environment Variables (Static)'
+                      : 'Not Configured'}
+                  </span>
+                </div>
+              )}
+
+              {/* Last Updated */}
+              {configStatus.updatedAt && (
+                <div>
+                  <span className="text-gray-400">Last Updated: </span>
+                  <span className="text-white">
+                    {new Date(configStatus.updatedAt).toLocaleString()}
+                  </span>
+                </div>
+              )}
+
               {/* Connection Status */}
               <div className="flex items-center gap-2">
                 <span className="text-gray-400">Status:</span>
@@ -348,26 +596,42 @@ export default function AdminPage() {
           <h2 className="text-lg font-semibold text-white mb-4">Setup Instructions</h2>
 
           <div className="space-y-4 text-gray-300 text-sm">
-            <p>To configure the dashboard, set these environment variables in Vercel:</p>
-
-            <div className="bg-gray-900 rounded p-4 font-mono text-xs space-y-2">
-              <div>
-                <span className="text-blue-400">GITHUB_TOKEN</span>=ghp_xxxxxxxxxxxx
-              </div>
-              <div>
-                <span className="text-blue-400">GITHUB_REPO</span>=owner/repo-name
-              </div>
-              <div>
-                <span className="text-blue-400">REPORTS_PATH</span>=reports
-              </div>
-              <div>
-                <span className="text-blue-400">ADMIN_PASSWORD</span>=your-password
-              </div>
+            <div>
+              <h3 className="text-white font-semibold mb-2">Option 1: Dynamic Configuration (Recommended)</h3>
+              <p className="mb-2">
+                Use Vercel KV for dynamic configuration that can be changed without redeployment:
+              </p>
+              <ol className="list-decimal list-inside space-y-1 text-gray-400">
+                <li>Set up Vercel KV in your project (KV_REST_API_URL and KV_REST_API_TOKEN are auto-configured)</li>
+                <li>Set ADMIN_PASSWORD environment variable</li>
+                <li>Use the "Edit Configuration" button above to configure GitHub connection</li>
+                <li>Changes take effect immediately without redeployment</li>
+              </ol>
             </div>
 
-            <p className="text-gray-400">
-              After setting environment variables, redeploy the application for changes to take effect.
-            </p>
+            <div className="pt-4 border-t border-gray-700">
+              <h3 className="text-white font-semibold mb-2">Option 2: Environment Variables (Static)</h3>
+              <p className="mb-2">
+                Set these environment variables in Vercel for static configuration:
+              </p>
+              <div className="bg-gray-900 rounded p-4 font-mono text-xs space-y-2 mb-2">
+                <div>
+                  <span className="text-blue-400">GITHUB_TOKEN</span>=ghp_xxxxxxxxxxxx
+                </div>
+                <div>
+                  <span className="text-blue-400">GITHUB_REPO</span>=owner/repo-name
+                </div>
+                <div>
+                  <span className="text-blue-400">REPORTS_PATH</span>=reports
+                </div>
+                <div>
+                  <span className="text-blue-400">ADMIN_PASSWORD</span>=your-password
+                </div>
+              </div>
+              <p className="text-gray-400">
+                After setting environment variables, redeploy the application for changes to take effect.
+              </p>
+            </div>
 
             <a
               href="https://vercel.com/docs/environment-variables"
@@ -375,7 +639,7 @@ export default function AdminPage() {
               rel="noopener noreferrer"
               className="text-blue-400 hover:text-blue-300 inline-block"
             >
-              Vercel Environment Variables Documentation &rarr;
+              Vercel Documentation &rarr;
             </a>
           </div>
         </div>
