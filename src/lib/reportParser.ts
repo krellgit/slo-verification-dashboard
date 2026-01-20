@@ -129,11 +129,41 @@ interface RawKeyword {
 }
 
 /**
+ * Normalize S3 format to expected format
+ * Maps Title Case with spaces to snake_case
+ */
+function normalizeS3Format(raw: any): RawSLOReport {
+  const normalized: any = { ...raw };
+
+  // Map S3 Title Case keys to snake_case
+  const keyMappings: Record<string, string> = {
+    'Product Profile': 'product_profile',
+    'Search Terms': 'search_terms',
+    'intent_themes_processed': 'customer_intent',
+    'USPs': 'usp_evaluation',
+    'Keywords': 'keyword_intelligence',
+    'Content': 'listing_creation',
+    'ASIN': 'asin',
+    'MSKU': 'msku',
+  };
+
+  for (const [oldKey, newKey] of Object.entries(keyMappings)) {
+    if (raw[oldKey] !== undefined) {
+      normalized[newKey] = raw[oldKey];
+    }
+  }
+
+  return normalized;
+}
+
+/**
  * Parse raw JSON report content to VerificationInput format
  * Handles field name variations from the SLO pipeline
  */
 export function parseReport(raw: unknown, fileAsin?: string): VerificationInput {
-  const report = raw as RawSLOReport;
+  // Normalize S3 format if needed
+  const normalizedRaw = normalizeS3Format(raw);
+  const report = normalizedRaw as RawSLOReport;
 
   // Extract ASIN from various possible locations
   const asin = extractAsin(report, fileAsin);
@@ -157,9 +187,15 @@ export function parseReport(raw: unknown, fileAsin?: string): VerificationInput 
  * Extract ASIN from report or filename
  */
 function extractAsin(report: RawSLOReport, fileAsin?: string): string {
-  // Try direct field
+  // Try direct field (lowercase)
   if (report.asin) {
     return report.asin;
+  }
+
+  // Try uppercase ASIN field (S3 format)
+  const rawReport = report as any;
+  if (rawReport.ASIN) {
+    return rawReport.ASIN;
   }
 
   // Try product_profile
@@ -269,7 +305,23 @@ function parseProductContext(report: RawSLOReport): ProductContextInput | undefi
  * Parse M2: Competitor Discovery
  */
 function parseCompetitorDiscovery(report: RawSLOReport): CompetitorDiscoveryInput | undefined {
-  const hasSearchTerms = report.search_terms && report.search_terms.length > 0;
+  // Handle S3 format where search_terms is an object with selected/generated arrays
+  let searchTerms: string[] | undefined;
+  if (report.search_terms) {
+    if (Array.isArray(report.search_terms)) {
+      // Already an array of strings
+      searchTerms = report.search_terms;
+    } else if (typeof report.search_terms === 'object') {
+      // S3 format: { selected: [{text, score}], generated: [{text, score}] }
+      const stObj = report.search_terms as any;
+      const selected = stObj.selected || stObj.generated || [];
+      searchTerms = selected.map((item: any) =>
+        typeof item === 'string' ? item : item.text || item.term || String(item)
+      );
+    }
+  }
+
+  const hasSearchTerms = searchTerms && searchTerms.length > 0;
   const hasCompetitors = report.competitors && (
     report.competitors.raw_list ||
     report.competitors.trimmed_list ||
@@ -283,7 +335,7 @@ function parseCompetitorDiscovery(report: RawSLOReport): CompetitorDiscoveryInpu
   const result: CompetitorDiscoveryInput = {};
 
   if (hasSearchTerms) {
-    result.search_terms = report.search_terms;
+    result.search_terms = searchTerms;
   }
 
   if (report.competitors) {
@@ -326,7 +378,8 @@ function parseCustomerIntent(report: RawSLOReport): CustomerIntentInput | undefi
  * Parse M2.3: USP Evaluation
  */
 function parseUSPEvaluation(report: RawSLOReport): USPEvaluationInput | undefined {
-  const usps = report.usps;
+  // Check both normalized and original field names
+  const usps = report.usp_evaluation || report.usps || (report as any).USPs;
 
   if (!usps || !Array.isArray(usps) || usps.length === 0) {
     return undefined;
@@ -397,7 +450,8 @@ function normalizePriority(priority?: string): 'Primary' | 'Secondary' | 'Tertia
  * Parse M3: Keyword Intelligence
  */
 function parseKeywordIntelligence(report: RawSLOReport): KeywordIntelligenceInput | undefined {
-  const keywordsData = report.keywords;
+  // Check normalized and original field names
+  const keywordsData = report.keyword_intelligence || report.keywords || (report as any).Keywords;
 
   if (!keywordsData?.enriched || !Array.isArray(keywordsData.enriched)) {
     return undefined;
@@ -503,7 +557,8 @@ function normalizeRiskFlag(flag?: string): 'none' | 'low' | 'medium' | 'high' | 
  * Parse M4: Listing Creation
  */
 function parseListingCreation(report: RawSLOReport): ListingCreationInput | undefined {
-  const listing = report.listing;
+  // Check normalized and original field names
+  const listing = report.listing_creation || report.listing || (report as any).Content;
 
   if (!listing) {
     return undefined;
