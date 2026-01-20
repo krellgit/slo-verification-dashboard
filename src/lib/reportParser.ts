@@ -490,7 +490,7 @@ function parseKeywordIntelligence(report: RawSLOReport): KeywordIntelligenceInpu
 
   // Parse USP bundles if present
   if (keywordsData.bundles && Array.isArray(keywordsData.bundles)) {
-    result.usp_bundles = keywordsData.bundles.map((b) => ({
+    result.usp_bundles = keywordsData.bundles.map((b: any) => ({
       usp_id: `usp_${b.usp_id}`,
       keywords: b.keywords,
     }));
