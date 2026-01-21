@@ -164,8 +164,8 @@ export function AsinList({ asins, selectedAsin, onSelect, isLoading }: AsinListP
         </div>
       </div>
 
-      {/* ASIN Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-5">
+      {/* ASIN List */}
+      <div className="flex flex-col gap-3 p-4 max-h-[calc(100vh-200px)] overflow-y-auto">
         {filteredAndSorted.map((item) => {
           const config = statusConfig[item.status];
           const isSelected = selectedAsin === item.asin;
@@ -175,27 +175,27 @@ export function AsinList({ asins, selectedAsin, onSelect, isLoading }: AsinListP
               key={item.asin}
               onClick={() => onSelect(item.asin)}
               className={`
-                text-left p-5 rounded-xl border-2 transition-all duration-200
+                w-full text-left p-4 rounded-lg border-2 transition-all duration-200
                 ${isSelected
-                  ? 'border-indigo-500 ring-4 ring-indigo-100 bg-indigo-50 shadow-lg scale-105'
-                  : 'border-slate-200 hover:border-slate-300 hover:shadow-lg hover:scale-102 bg-white'
+                  ? 'border-indigo-500 ring-2 ring-indigo-200 bg-indigo-50 shadow-md'
+                  : 'border-slate-200 hover:border-indigo-300 hover:shadow-md bg-white'
                 }
               `}
             >
               {/* Header row */}
-              <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-center justify-between gap-2 mb-3">
                 <div className="min-w-0 flex-1">
-                  <p className="font-mono text-sm font-bold text-slate-900 truncate mb-1">
+                  <p className="font-mono text-xs font-bold text-slate-900 mb-1">
                     {item.asin}
                   </p>
-                  <p className="text-xs text-slate-600 truncate leading-relaxed" title={item.productName}>
+                  <p className="text-xs text-slate-600 line-clamp-2 leading-snug" title={item.productName}>
                     {item.productName}
                   </p>
                 </div>
                 <span
                   className={`
-                    shrink-0 px-3 py-1 text-xs font-bold rounded-lg
-                    ${config.bg} ${config.color} ${config.border} border-2 shadow-sm
+                    shrink-0 px-2 py-1 text-xs font-bold rounded-md
+                    ${config.bg} ${config.color} border ${config.border}
                   `}
                 >
                   {config.label}
@@ -203,25 +203,25 @@ export function AsinList({ asins, selectedAsin, onSelect, isLoading }: AsinListP
               </div>
 
               {/* Pass rate bar */}
-              <div className="mt-4">
-                <div className="flex items-center justify-between text-xs mb-2">
-                  <span className="text-slate-600 font-medium">Pass Rate</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-600">Pass Rate</span>
                   <span className={`font-bold ${item.passRate >= 80 ? 'text-emerald-700' : item.passRate >= 50 ? 'text-amber-700' : 'text-rose-700'}`}>
                     {item.passRate.toFixed(0)}%
                   </span>
                 </div>
-                <div className="h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 shadow-sm ${
+                    className={`h-full rounded-full transition-all duration-500 ${
                       item.passRate >= 80 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : item.passRate >= 50 ? 'bg-gradient-to-r from-amber-500 to-amber-600' : 'bg-gradient-to-r from-rose-500 to-rose-600'
                     }`}
                     style={{ width: `${item.passRate}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-xs text-slate-500 mt-2">
-                  <span className="font-medium">{item.passedChecks}/{item.totalChecks} checks</span>
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>{item.passedChecks}/{item.totalChecks}</span>
                   {item.failedChecks > 0 && (
-                    <span className="text-rose-600 font-bold">{item.failedChecks} failed</span>
+                    <span className="text-rose-600 font-semibold">{item.failedChecks} fail</span>
                   )}
                 </div>
               </div>
