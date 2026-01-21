@@ -300,7 +300,7 @@ function parseProductContext(report: RawSLOReport): ProductContextInput | undefi
     const amazonData = (report as any)['Data from Amazon'];
     if (amazonData?.attributes?.item_name?.[0]?.value) {
       truthSet.product_name = amazonData.attributes.item_name[0].value;
-    } else if (profile.product_summary) {
+    } else if (profile.product_summary && typeof profile.product_summary === 'string') {
       // Fallback to product_summary if available
       truthSet.product_name = profile.product_summary.substring(0, 100);
     }
