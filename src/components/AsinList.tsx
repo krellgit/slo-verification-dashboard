@@ -27,9 +27,9 @@ type SortField = 'status' | 'asin' | 'passRate';
 type FilterStatus = 'all' | 'pass' | 'fail' | 'review';
 
 const statusConfig: Record<AsinStatus, { label: string; color: string; bg: string; border: string }> = {
-  PASS: { label: 'PASS', color: 'text-green-700', bg: 'bg-green-100', border: 'border-green-200' },
-  FAIL: { label: 'FAIL', color: 'text-red-700', bg: 'bg-red-100', border: 'border-red-200' },
-  REVIEW: { label: 'REVIEW', color: 'text-yellow-700', bg: 'bg-yellow-100', border: 'border-yellow-200' },
+  PASS: { label: 'PASS', color: 'text-emerald-700', bg: 'bg-emerald-100', border: 'border-emerald-300' },
+  FAIL: { label: 'FAIL', color: 'text-rose-700', bg: 'bg-rose-100', border: 'border-rose-300' },
+  REVIEW: { label: 'REVIEW', color: 'text-amber-700', bg: 'bg-amber-100', border: 'border-amber-300' },
 };
 
 const statusPriority: Record<AsinStatus, number> = {
@@ -76,13 +76,13 @@ export function AsinList({ asins, selectedAsin, onSelect, isLoading }: AsinListP
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8">
+      <div className="bg-white rounded-xl border-2 border-slate-200 shadow-md p-8">
         <div className="flex flex-col items-center justify-center">
-          <svg className="animate-spin h-8 w-8 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-10 w-10 text-indigo-600 mb-4" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
-          <p className="text-sm text-gray-500">Loading ASINs...</p>
+          <p className="text-sm text-slate-600 font-medium">Loading ASINs...</p>
         </div>
       </div>
     );
@@ -90,40 +90,54 @@ export function AsinList({ asins, selectedAsin, onSelect, isLoading }: AsinListP
 
   if (asins.length === 0) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8">
+      <div className="bg-white rounded-xl border-2 border-slate-200 shadow-md p-8">
         <div className="text-center">
-          <p className="text-gray-500">No ASINs found</p>
-          <p className="text-sm text-gray-400 mt-1">Connect to a repository to load reports</p>
+          <p className="text-slate-700 font-medium">No ASINs found</p>
+          <p className="text-sm text-slate-500 mt-1">Connect to a repository to load reports</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+    <div className="bg-white rounded-xl border-2 border-slate-200 shadow-md overflow-hidden">
       {/* Header with counts */}
-      <div className="px-4 py-3 border-b border-gray-200">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-gray-900">ASINs</h2>
-            <span className="text-sm text-gray-500">
-              {counts.total} total
-              {counts.pass > 0 && <span className="text-green-600 ml-2">{counts.pass} pass</span>}
-              {counts.fail > 0 && <span className="text-red-600 ml-2">{counts.fail} fail</span>}
-              {counts.review > 0 && <span className="text-yellow-600 ml-2">{counts.review} review</span>}
-            </span>
+      <div className="px-5 py-4 border-b-2 border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-slate-900">ASINs</h2>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-lg font-semibold">
+                {counts.total} total
+              </span>
+              {counts.pass > 0 && (
+                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-semibold">
+                  {counts.pass} pass
+                </span>
+              )}
+              {counts.fail > 0 && (
+                <span className="px-2 py-1 bg-rose-100 text-rose-700 rounded-lg font-semibold">
+                  {counts.fail} fail
+                </span>
+              )}
+              {counts.review > 0 && (
+                <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-lg font-semibold">
+                  {counts.review} review
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Controls */}
           <div className="flex items-center gap-3">
             {/* Filter */}
-            <div className="flex items-center gap-1">
-              <label htmlFor="filter-status" className="text-xs text-gray-500">Filter:</label>
+            <div className="flex items-center gap-2">
+              <label htmlFor="filter-status" className="text-xs text-slate-600 font-medium">Filter:</label>
               <select
                 id="filter-status"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
-                className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500"
+                className="text-sm border-2 border-slate-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium"
               >
                 <option value="all">All</option>
                 <option value="pass">Pass</option>
@@ -133,13 +147,13 @@ export function AsinList({ asins, selectedAsin, onSelect, isLoading }: AsinListP
             </div>
 
             {/* Sort */}
-            <div className="flex items-center gap-1">
-              <label htmlFor="sort-by" className="text-xs text-gray-500">Sort:</label>
+            <div className="flex items-center gap-2">
+              <label htmlFor="sort-by" className="text-xs text-slate-600 font-medium">Sort:</label>
               <select
                 id="sort-by"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortField)}
-                className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500"
+                className="text-sm border-2 border-slate-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium"
               >
                 <option value="status">Status (failures first)</option>
                 <option value="passRate">Pass Rate (lowest first)</option>
@@ -151,7 +165,7 @@ export function AsinList({ asins, selectedAsin, onSelect, isLoading }: AsinListP
       </div>
 
       {/* ASIN Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-5">
         {filteredAndSorted.map((item) => {
           const config = statusConfig[item.status];
           const isSelected = selectedAsin === item.asin;
@@ -161,27 +175,27 @@ export function AsinList({ asins, selectedAsin, onSelect, isLoading }: AsinListP
               key={item.asin}
               onClick={() => onSelect(item.asin)}
               className={`
-                text-left p-4 rounded-lg border-2 transition-all duration-150
+                text-left p-5 rounded-xl border-2 transition-all duration-200
                 ${isSelected
-                  ? 'border-blue-500 ring-2 ring-blue-200 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300 hover:shadow-sm bg-white'
+                  ? 'border-indigo-500 ring-4 ring-indigo-100 bg-indigo-50 shadow-lg scale-105'
+                  : 'border-slate-200 hover:border-slate-300 hover:shadow-lg hover:scale-102 bg-white'
                 }
               `}
             >
               {/* Header row */}
-              <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="min-w-0 flex-1">
-                  <p className="font-mono text-sm font-semibold text-gray-900 truncate">
+                  <p className="font-mono text-sm font-bold text-slate-900 truncate mb-1">
                     {item.asin}
                   </p>
-                  <p className="text-xs text-gray-500 truncate" title={item.productName}>
+                  <p className="text-xs text-slate-600 truncate leading-relaxed" title={item.productName}>
                     {item.productName}
                   </p>
                 </div>
                 <span
                   className={`
-                    shrink-0 px-2 py-0.5 text-xs font-semibold rounded
-                    ${config.bg} ${config.color} ${config.border} border
+                    shrink-0 px-3 py-1 text-xs font-bold rounded-lg
+                    ${config.bg} ${config.color} ${config.border} border-2 shadow-sm
                   `}
                 >
                   {config.label}
@@ -189,25 +203,25 @@ export function AsinList({ asins, selectedAsin, onSelect, isLoading }: AsinListP
               </div>
 
               {/* Pass rate bar */}
-              <div className="mt-3">
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-gray-500">Pass Rate</span>
-                  <span className={`font-medium ${item.passRate >= 80 ? 'text-green-600' : item.passRate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <span className="text-slate-600 font-medium">Pass Rate</span>
+                  <span className={`font-bold ${item.passRate >= 80 ? 'text-emerald-700' : item.passRate >= 50 ? 'text-amber-700' : 'text-rose-700'}`}>
                     {item.passRate.toFixed(0)}%
                   </span>
                 </div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner">
                   <div
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      item.passRate >= 80 ? 'bg-green-500' : item.passRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                    className={`h-full rounded-full transition-all duration-500 shadow-sm ${
+                      item.passRate >= 80 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : item.passRate >= 50 ? 'bg-gradient-to-r from-amber-500 to-amber-600' : 'bg-gradient-to-r from-rose-500 to-rose-600'
                     }`}
                     style={{ width: `${item.passRate}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
-                  <span>{item.passedChecks}/{item.totalChecks} checks</span>
+                <div className="flex items-center justify-between text-xs text-slate-500 mt-2">
+                  <span className="font-medium">{item.passedChecks}/{item.totalChecks} checks</span>
                   {item.failedChecks > 0 && (
-                    <span className="text-red-500">{item.failedChecks} failed</span>
+                    <span className="text-rose-600 font-bold">{item.failedChecks} failed</span>
                   )}
                 </div>
               </div>
@@ -217,8 +231,14 @@ export function AsinList({ asins, selectedAsin, onSelect, isLoading }: AsinListP
       </div>
 
       {filteredAndSorted.length === 0 && (
-        <div className="p-8 text-center">
-          <p className="text-gray-500">No ASINs match the current filter</p>
+        <div className="p-12 text-center">
+          <div className="inline-block p-4 bg-slate-100 rounded-full mb-4">
+            <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <p className="text-slate-600 font-medium">No ASINs match the current filter</p>
+          <p className="text-sm text-slate-500 mt-1">Try adjusting your filters</p>
         </div>
       )}
     </div>

@@ -295,21 +295,32 @@ export default function AdminPage() {
 
   // Admin dashboard
   return (
-    <div className="min-h-screen bg-gray-900 p-4 sm:p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 sm:p-8">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
+        <div className="flex items-center justify-between mb-10">
           <div className="flex items-center gap-4">
+            <div className="p-3 bg-indigo-600 rounded-xl shadow-lg">
+              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-bold text-white">Admin Panel</h1>
+          </div>
+          <div className="flex items-center gap-3">
             <a
               href="/"
-              className="text-blue-400 hover:text-blue-300 text-sm"
+              className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 font-medium shadow-md hover:shadow-lg flex items-center gap-2"
             >
-              View Dashboard
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              Dashboard
             </a>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm transition-all duration-200 font-medium shadow-md hover:shadow-lg"
             >
               Logout
             </button>
@@ -317,9 +328,16 @@ export default function AdminPage() {
         </div>
 
         {/* Configuration Status */}
-        <div className="bg-gray-800 rounded-lg p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">GitHub Configuration</h2>
+        <div className="bg-slate-800 rounded-xl border-2 border-slate-700 shadow-xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-600 rounded-lg">
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-white">GitHub Configuration</h2>
+            </div>
             <div className="flex items-center gap-2">
               {!editMode && configStatus?.kvAvailable && (
                 <>
@@ -566,8 +584,15 @@ export default function AdminPage() {
         </div>
 
         {/* Test Connection */}
-        <div className="bg-gray-800 rounded-lg p-6 mb-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Test Connection</h2>
+        <div className="bg-slate-800 rounded-xl border-2 border-slate-700 shadow-xl p-6 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-emerald-600 rounded-lg">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-white">Test Connection</h2>
+          </div>
 
           <button
             onClick={testConnection}
@@ -599,8 +624,15 @@ export default function AdminPage() {
         </div>
 
         {/* Setup Instructions */}
-        <div className="bg-gray-800 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Setup Instructions</h2>
+        <div className="bg-slate-800 rounded-xl border-2 border-slate-700 shadow-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-sky-600 rounded-lg">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-white">Setup Instructions</h2>
+          </div>
 
           <div className="space-y-4 text-gray-300 text-sm">
             <div>
