@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getServerConfig, getConfigStatus, checkKVAvailability } from '@/lib/serverConfig';
-import { validateConfig, checkRateLimit, listReports, GitHubConfig } from '@/lib/github';
+import { validateConfig as validateGitHubConfig, checkRateLimit, listReports as listGitHubReports, GitHubConfig } from '@/lib/github';
+import { validateS3Config, listS3Reports } from '@/lib/s3';
 import { saveConfigToKV, deleteConfigFromKV, validateConfigInput } from '@/lib/kvConfig';
 
 const SESSION_COOKIE = 'slovd_admin_session';
@@ -50,34 +51,53 @@ export async function GET() {
     let reportCount: number | undefined;
 
     if (config) {
-      // Test the connection
-      const validation = await validateConfig(config);
+      // Test connection based on source type
+      if (config.source === 's3' && config.s3) {
+        const validation = await validateS3Config(config.s3);
 
-      if (validation.valid) {
-        connectionStatus = 'connected';
+        if (validation.valid) {
+          connectionStatus = 'connected';
 
-        // Get rate limit info
-        try {
-          const rateLimitInfo = await checkRateLimit(config);
-          rateLimit = {
-            remaining: rateLimitInfo.remaining,
-            limit: rateLimitInfo.limit,
-            resetAt: rateLimitInfo.resetAt.toISOString(),
-          };
-        } catch {
-          // Ignore rate limit check errors
+          // Get report count from S3
+          try {
+            const reports = await listS3Reports(config.s3);
+            reportCount = reports.length;
+          } catch {
+            // Ignore report listing errors
+          }
+        } else {
+          connectionStatus = 'error';
+          connectionError = validation.error;
         }
+      } else if (config.source === 'github' && config.github) {
+        const validation = await validateGitHubConfig(config.github);
 
-        // Get report count
-        try {
-          const reports = await listReports(config);
-          reportCount = reports.length;
-        } catch {
-          // Ignore report listing errors
+        if (validation.valid) {
+          connectionStatus = 'connected';
+
+          // Get rate limit info for GitHub
+          try {
+            const rateLimitInfo = await checkRateLimit(config.github);
+            rateLimit = {
+              remaining: rateLimitInfo.remaining,
+              limit: rateLimitInfo.limit,
+              resetAt: rateLimitInfo.resetAt.toISOString(),
+            };
+          } catch {
+            // Ignore rate limit check errors
+          }
+
+          // Get report count from GitHub
+          try {
+            const reports = await listGitHubReports(config.github);
+            reportCount = reports.length;
+          } catch {
+            // Ignore report listing errors
+          }
+        } else {
+          connectionStatus = 'error';
+          connectionError = validation.error;
         }
-      } else {
-        connectionStatus = 'error';
-        connectionError = validation.error;
       }
     }
 
@@ -94,6 +114,9 @@ export async function GET() {
         REPORTS_PATH: !!process.env.REPORTS_PATH,
         ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
         REDIS_URL: !!(process.env.slovd_config_REDIS_URL || process.env.REDIS_URL || process.env.KV_URL),
+        AWS_ACCESS_KEY_ID: !!process.env.AWS_ACCESS_KEY_ID,
+        AWS_SECRET_ACCESS_KEY: !!process.env.AWS_SECRET_ACCESS_KEY,
+        S3_BUCKET: !!process.env.S3_BUCKET,
       },
     });
   } catch (error) {
@@ -128,26 +151,54 @@ export async function POST(request: Request) {
       if (!config) {
         return NextResponse.json({
           success: false,
-          error: 'GitHub configuration not set. Please configure environment variables.',
+          error: 'Report source not configured. Please configure S3 or GitHub connection.',
         });
       }
 
-      const validation = await validateConfig(config);
+      // Test based on source type
+      if (config.source === 's3' && config.s3) {
+        const validation = await validateS3Config(config.s3);
 
-      if (!validation.valid) {
+        if (!validation.valid) {
+          return NextResponse.json({
+            success: false,
+            error: validation.error,
+          });
+        }
+
+        // List reports from S3
+        const reports = await listS3Reports(config.s3);
+
         return NextResponse.json({
-          success: false,
-          error: validation.error,
+          success: true,
+          source: 's3',
+          reportCount: reports.length,
+          reports: reports.slice(0, 5).map(r => ({ asin: r.asin, name: r.name })),
+        });
+      } else if (config.source === 'github' && config.github) {
+        const validation = await validateGitHubConfig(config.github);
+
+        if (!validation.valid) {
+          return NextResponse.json({
+            success: false,
+            error: validation.error,
+          });
+        }
+
+        // List reports from GitHub
+        const reports = await listGitHubReports(config.github);
+
+        return NextResponse.json({
+          success: true,
+          source: 'github',
+          reportCount: reports.length,
+          reports: reports.slice(0, 5).map(r => ({ asin: r.asin, name: r.name })),
         });
       }
-
-      // Also try to list reports
-      const reports = await listReports(config);
 
       return NextResponse.json({
-        success: true,
-        reportCount: reports.length,
-        reports: reports.slice(0, 5).map(r => ({ asin: r.asin, name: r.name })),
+        success: false,
+        error: 'Invalid configuration source',
       });
     }
 

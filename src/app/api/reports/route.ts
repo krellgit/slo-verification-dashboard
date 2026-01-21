@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerConfig, getConfigStatus } from '@/lib/serverConfig';
-import { listReports, fetchReport, GitHubConfig } from '@/lib/github';
+import { listReports as listGitHubReports, fetchReport as fetchGitHubReport } from '@/lib/github';
+import { listS3Reports, fetchS3Report } from '@/lib/s3';
 import { parseReport } from '@/lib/reportParser';
 import { verify } from '@/lib/verificationEngine';
 import { aggregateStats } from '@/lib/statsAggregator';
@@ -11,7 +12,7 @@ export const revalidate = 0;
 
 /**
  * GET /api/reports - Get all reports with verification results
- * Public endpoint - uses server-side GitHub config
+ * Public endpoint - uses server-side config (GitHub or S3)
  */
 export async function GET() {
   try {
@@ -21,20 +22,36 @@ export async function GET() {
       const status = await getConfigStatus();
       return NextResponse.json({
         configured: false,
-        error: 'GitHub repository not configured. Admin must configure GitHub connection.',
+        error: 'Report source not configured. Admin must configure GitHub or S3 connection.',
         status,
       }, { status: 503 });
     }
 
-    // Fetch list of reports from GitHub
-    const reportFiles = await listReports(config);
+    // Fetch list of reports based on source
+    let reportFiles: Array<{ name: string; asin: string; path?: string; key?: string }> = [];
+
+    if (config.source === 's3' && config.s3) {
+      const s3Files = await listS3Reports(config.s3);
+      reportFiles = s3Files.map(f => ({
+        name: f.name,
+        asin: f.asin,
+        key: f.key,
+      }));
+    } else if (config.source === 'github' && config.github) {
+      const githubFiles = await listGitHubReports(config.github);
+      reportFiles = githubFiles.map(f => ({
+        name: f.name,
+        asin: f.asin,
+        path: f.path,
+      }));
+    }
 
     if (reportFiles.length === 0) {
       return NextResponse.json({
         configured: true,
         reports: [],
         stats: null,
-        message: 'No JSON reports found in the configured directory',
+        message: 'No JSON reports found in the configured location',
       });
     }
 
@@ -44,7 +61,17 @@ export async function GET() {
 
     for (const file of reportFiles) {
       try {
-        const rawContent = await fetchReport(file.path, config);
+        let rawContent: unknown;
+
+        // Fetch based on source
+        if (config.source === 's3' && config.s3 && file.key) {
+          rawContent = await fetchS3Report(file.key, config.s3);
+        } else if (config.source === 'github' && config.github && file.path) {
+          rawContent = await fetchGitHubReport(file.path, config.github);
+        } else {
+          throw new Error('Invalid file or config');
+        }
+
         const parsed = parseReport(rawContent, file.asin);
         const result = verify(parsed);
         verificationResults.push(result);
@@ -69,15 +96,15 @@ export async function GET() {
         processedFiles: verificationResults.length,
         failedFiles: errors.length,
         timestamp: new Date().toISOString(),
+        source: config.source,
       },
     });
   } catch (error) {
     console.error('Reports API error:', error);
 
-    // Handle GitHub-specific errors
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const isRateLimit = errorMessage.includes('rate limit');
-    const isAuthError = errorMessage.includes('401') || errorMessage.includes('token');
+    const isAuthError = errorMessage.includes('401') || errorMessage.includes('token') || errorMessage.includes('AccessDenied');
 
     return NextResponse.json({
       configured: true,

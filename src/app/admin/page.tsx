@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 
 interface ConfigStatus {
   configured: boolean;
-  source?: 'kv' | 'env' | 'none';
-  repo?: string;
+  source?: 's3' | 'kv' | 'env' | 'none';
+  location?: string; // S3 bucket/prefix or GitHub repo
+  repo?: string; // Deprecated - use location
   path?: string;
   updatedAt?: string;
   connectionStatus: 'connected' | 'error' | 'not_configured';
@@ -23,6 +24,9 @@ interface ConfigStatus {
     REPORTS_PATH: boolean;
     ADMIN_PASSWORD: boolean;
     REDIS_URL: boolean;
+    AWS_ACCESS_KEY_ID: boolean;
+    AWS_SECRET_ACCESS_KEY: boolean;
+    S3_BUCKET: boolean;
   };
 }
 
@@ -458,10 +462,12 @@ export default function AdminPage() {
                         : 'bg-gray-700 text-gray-300'
                     }`}
                   >
-                    {configStatus.source === 'kv'
-                      ? 'Redis (Dynamic)'
+                    {configStatus.source === 's3'
+                      ? 'AWS S3 (Environment Variables)'
+                      : configStatus.source === 'kv'
+                      ? 'GitHub via Redis (Dynamic)'
                       : configStatus.source === 'env'
-                      ? 'Environment Variables (Static)'
+                      ? 'GitHub via Environment Variables (Static)'
                       : 'Not Configured'}
                   </span>
                 </div>
@@ -503,11 +509,13 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* Repository Info */}
-              {configStatus.repo && (
+              {/* Location Info */}
+              {(configStatus.location || configStatus.repo) && (
                 <div>
-                  <span className="text-gray-400">Repository: </span>
-                  <span className="text-white font-mono">{configStatus.repo}</span>
+                  <span className="text-gray-400">
+                    {configStatus.source === 's3' ? 'S3 Location: ' : 'Repository: '}
+                  </span>
+                  <span className="text-white font-mono">{configStatus.location || configStatus.repo}</span>
                 </div>
               )}
 
