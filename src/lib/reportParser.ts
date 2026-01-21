@@ -220,6 +220,12 @@ function extractProductName(report: RawSLOReport): string {
     return report.product_name;
   }
 
+  // From Data from Amazon (S3 format)
+  const amazonData = (report as any)['Data from Amazon'];
+  if (amazonData?.attributes?.item_name?.[0]?.value) {
+    return amazonData.attributes.item_name[0].value;
+  }
+
   // From product_profile
   const profile = report.product_profile;
   if (profile) {
@@ -272,15 +278,45 @@ function parseProductContext(report: RawSLOReport): ProductContextInput | undefi
     result.initial_keywords = profile.initial_keyword_ideas;
   }
 
-  // Build truth_set from profile data
+  // Build truth_set from profile data and Data from Amazon
   const truthSet: ProductContextInput['truth_set'] = {};
-  if (profile.brand) truthSet.brand = profile.brand;
-  if (profile.product_name) truthSet.product_name = profile.product_name;
-  if (profile.features) truthSet.features = profile.features;
-  if (profile.specifications) truthSet.specifications = profile.specifications;
-  // If key_attributes exist, also add as features
-  if (profile.key_attributes && !truthSet.features) {
+
+  // Extract brand from profile or Data from Amazon
+  if (profile.brand) {
+    truthSet.brand = profile.brand;
+  } else {
+    // Try Data from Amazon (S3 format)
+    const amazonData = (report as any)['Data from Amazon'];
+    if (amazonData?.attributes?.brand?.[0]?.value) {
+      truthSet.brand = amazonData.attributes.brand[0].value;
+    }
+  }
+
+  // Extract product_name from profile or Data from Amazon
+  if (profile.product_name) {
+    truthSet.product_name = profile.product_name;
+  } else {
+    // Try Data from Amazon (S3 format)
+    const amazonData = (report as any)['Data from Amazon'];
+    if (amazonData?.attributes?.item_name?.[0]?.value) {
+      truthSet.product_name = amazonData.attributes.item_name[0].value;
+    } else if (profile.product_summary) {
+      // Fallback to product_summary if available
+      truthSet.product_name = profile.product_summary.substring(0, 100);
+    }
+  }
+
+  // Extract features
+  if (profile.features) {
+    truthSet.features = profile.features;
+  } else if (profile.key_attributes && Array.isArray(profile.key_attributes)) {
+    // Use key_attributes as features (S3 format)
     truthSet.features = profile.key_attributes;
+  }
+
+  // Extract specifications if available
+  if (profile.specifications) {
+    truthSet.specifications = profile.specifications;
   }
 
   if (Object.keys(truthSet).length > 0) {
