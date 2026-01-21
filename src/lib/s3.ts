@@ -69,7 +69,7 @@ export async function listS3Reports(configOverride?: S3Config): Promise<S3Report
       Prefix: config.prefix,
     });
 
-    const response = await command.send(client);
+    const response = await client.send(command);
 
     if (!response.Contents) {
       return [];
@@ -114,7 +114,7 @@ export async function fetchS3Report(key: string, configOverride?: S3Config): Pro
       Key: key,
     });
 
-    const response = await command.send(client);
+    const response = await client.send(command);
 
     if (!response.Body) {
       throw new Error('Empty response body from S3');
@@ -160,7 +160,7 @@ export async function validateS3Config(configOverride?: S3Config): Promise<{
       MaxKeys: 1,
     });
 
-    await command.send(client);
+    await client.send(command);
     return { valid: true };
   } catch (error) {
     const err = error as any;
