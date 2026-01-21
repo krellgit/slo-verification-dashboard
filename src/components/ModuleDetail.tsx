@@ -8,7 +8,7 @@ interface ModuleDetailProps {
   onRerun?: () => void;
 }
 
-const statusLabels: Record<string, { text: string; color: string; bg: string; icon: JSX.Element }> = {
+const statusLabels: Record<string, { text: string; color: string; bg: string; icon: React.ReactNode }> = {
   PASS: {
     text: 'PASS',
     color: 'text-emerald-700',

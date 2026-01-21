@@ -7,7 +7,7 @@ interface CheckItemProps {
   check: CheckResult;
 }
 
-const statusConfig: Record<CheckStatus, { icon: JSX.Element; color: string; bg: string; border: string; iconBg: string }> = {
+const statusConfig: Record<CheckStatus, { icon: React.ReactNode; color: string; bg: string; border: string; iconBg: string }> = {
   PASS: {
     icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>,
     color: 'text-emerald-700',
