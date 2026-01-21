@@ -231,7 +231,7 @@ export async function POST(request: Request) {
       };
 
       // Test connection first
-      const connectionValidation = await validateConfig(newConfig);
+      const connectionValidation = await validateGitHubConfig(newConfig);
       if (!connectionValidation.valid) {
         return NextResponse.json({
           success: false,
