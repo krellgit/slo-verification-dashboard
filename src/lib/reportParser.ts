@@ -73,8 +73,10 @@ export interface RawSLOReport {
   listing?: {
     title?: string;
     bullets?: string[];
+    bullet_points?: string[]; // Alternative field name
     description?: string;
     backend_terms?: string;
+    backend_search_terms?: string; // Alternative field name
     [key: string]: unknown;
   };
 
@@ -118,6 +120,8 @@ interface RawKeyword {
   score?: number;
   priority_tier?: string;
   tier?: string;
+  tier_notes?: string;
+  demand_tier?: unknown;
   product_intent_relevance?: number;
   competitor_alignment_score?: number;
   search_demand_score?: number;
@@ -319,6 +323,12 @@ function parseProductContext(report: RawSLOReport): ProductContextInput | undefi
     truthSet.specifications = profile.specifications;
   }
 
+  // Warn if brand is missing
+  if (!truthSet.brand) {
+    const asin = (report as any).ASIN || (report as any).asin || 'unknown';
+    console.warn(`[M1 Parser] No brand found for ASIN ${asin} - checked Product Profile and Data from Amazon`);
+  }
+
   if (Object.keys(truthSet).length > 0) {
     result.truth_set = truthSet;
   }
@@ -368,6 +378,12 @@ function parseCompetitorDiscovery(report: RawSLOReport): CompetitorDiscoveryInpu
     return undefined;
   }
 
+  // Warn if competitors field is missing
+  if (!report.competitors) {
+    const asin = (report as any).ASIN || (report as any).asin || 'unknown';
+    console.warn(`[M2 Parser] Missing competitors field for ASIN ${asin} - CompetitorDiscoveryInput will be incomplete`);
+  }
+
   const result: CompetitorDiscoveryInput = {};
 
   if (hasSearchTerms) {
@@ -390,6 +406,55 @@ function parseCompetitorDiscovery(report: RawSLOReport): CompetitorDiscoveryInpu
 }
 
 /**
+ * Normalize theme names to match VALID_THEME_NAMES
+ * Maps common variations to standard names
+ */
+function normalizeThemeName(name: string): string {
+  if (!name) return 'QUALITY';  // Safe default
+
+  const normalized = name.toUpperCase().trim();
+
+  // Valid theme names that pass through directly
+  const validThemes = [
+    'EASE_OF_USE', 'EASE_OF_CLEANING', 'DURABILITY', 'VALUE_FOR_MONEY',
+    'PERFORMANCE', 'COOKING_PERFORMANCE', 'DESIGN', 'SIZE', 'CAPACITY',
+    'NOISE_LEVEL', 'SAFETY', 'VERSATILITY', 'QUALITY', 'TEXTURE',
+    'HYDRATION', 'RESULTS', 'SMELL', 'PACKAGING', 'SHIPPING',
+    'CUSTOMER_SERVICE', 'WARRANTY', 'INGREDIENTS', 'EFFECTIVENESS'
+  ];
+
+  if (validThemes.includes(normalized)) {
+    return normalized;
+  }
+
+  // Common mappings for invalid theme names
+  const mappings: Record<string, string> = {
+    'USAGE': 'EASE_OF_USE',
+    'VALUE': 'VALUE_FOR_MONEY',
+    'COMPATIBILITY': 'VERSATILITY',
+    'APPEARANCE': 'DESIGN',
+    'MAINTENANCE': 'EASE_OF_CLEANING',
+    'SENSITIVITY': 'QUALITY',
+    'COMFORT': 'QUALITY',
+    'AESTHETICS': 'DESIGN',
+    'PRICE': 'VALUE_FOR_MONEY',
+    'LONGEVITY': 'DURABILITY',
+    'CLEANING': 'EASE_OF_CLEANING',
+    'FIT': 'SIZE',
+    'EASE': 'EASE_OF_USE',
+    'CONVENIENCE': 'EASE_OF_USE',
+    'RELIABILITY': 'DURABILITY',
+    'EFFICACY': 'EFFECTIVENESS',
+    'EFFICIENCY': 'PERFORMANCE',
+    'STYLE': 'DESIGN',
+    'LOOK': 'DESIGN',
+  };
+
+  // Return mapped value or original if no mapping exists
+  return mappings[normalized] || normalized;
+}
+
+/**
  * Parse M2.1: Customer Intent
  */
 function parseCustomerIntent(report: RawSLOReport): CustomerIntentInput | undefined {
@@ -403,9 +468,9 @@ function parseCustomerIntent(report: RawSLOReport): CustomerIntentInput | undefi
   return {
     themes: themes.map((t: RawIntentTheme, idx: number) => ({
       id: `theme_${idx + 1}`,
-      name: t.name || t.theme_name || `Theme ${idx + 1}`,
+      name: normalizeThemeName(t.name || t.theme_name || `Theme ${idx + 1}`),
       score: t.importance_score ?? t.score,
-      quotes: t.desires || t.quotes || [],
+      quotes: t.desires || t.quotes || (t as any).questions || [],
     })),
   };
 }
@@ -466,20 +531,22 @@ function parseUSPEvaluation(report: RawSLOReport): USPEvaluationInput | undefine
  * Normalize priority string to expected enum values
  */
 function normalizePriority(priority?: string): 'Primary' | 'Secondary' | 'Tertiary' | undefined {
-  if (!priority) return undefined;
+  if (!priority) return 'Secondary';  // Default to Secondary instead of undefined
 
   const normalized = priority.toLowerCase();
   if (normalized.includes('primary') || normalized === '1' || normalized === 'high') {
     return 'Primary';
   }
-  if (normalized.includes('secondary') || normalized === '2' || normalized === 'medium') {
+  if (normalized.includes('secondary') || normalized === '2' || normalized === 'medium' ||
+      normalized === 'custom' || normalized === 'standard') {
     return 'Secondary';
   }
   if (normalized.includes('tertiary') || normalized === '3' || normalized === 'low') {
     return 'Tertiary';
   }
 
-  return undefined;
+  // Default to Secondary for unrecognized values
+  return 'Secondary';
 }
 
 /**
@@ -515,7 +582,7 @@ function parseKeywordIntelligence(report: RawSLOReport): KeywordIntelligenceInpu
         keyword: k.keyword_text || k.keyword || '',
         keyword_canonical: k.keyword_canonical,
         score: k.keyword_strength_score ?? k.score,
-        tier: normalizeTier(k.priority_tier || k.tier),
+        tier: normalizeTier(k.priority_tier || k.tier) || extractTierFromNotes((k as any).tier_notes),
         components: Object.keys(components).length > 0 ? components : undefined,
         usp_bonus: k.usp_bonus,
         risk_flag: normalizeRiskFlag(k.risk_flag),
@@ -590,6 +657,48 @@ function normalizeRiskFlag(flag?: string): 'none' | 'low' | 'medium' | 'high' | 
 }
 
 /**
+ * Extract tier from tier_notes string description
+ * Used when priority_tier and tier fields are missing
+ */
+function extractTierFromNotes(tierNotes?: string): 'Primary' | 'Secondary' | 'Long-tail' | 'Excluded' | undefined {
+  if (!tierNotes || typeof tierNotes !== 'string') {
+    return undefined;
+  }
+
+  const notes = tierNotes.toLowerCase();
+
+  // Primary tier patterns
+  if (notes.includes('primary') || notes.includes('tier 1') || notes.includes('tier-1') ||
+      notes.includes('tier1') || notes.includes('high priority') || notes.includes('core keyword') ||
+      notes.includes('main keyword') || notes.includes('essential')) {
+    return 'Primary';
+  }
+
+  // Secondary tier patterns
+  if (notes.includes('secondary') || notes.includes('tier 2') || notes.includes('tier-2') ||
+      notes.includes('tier2') || notes.includes('medium priority') || notes.includes('supporting') ||
+      notes.includes('supplementary') || notes.includes('moderate')) {
+    return 'Secondary';
+  }
+
+  // Long-tail tier patterns
+  if (notes.includes('long-tail') || notes.includes('longtail') || notes.includes('long tail') ||
+      notes.includes('tier 3') || notes.includes('tier-3') || notes.includes('tier3') ||
+      notes.includes('niche') || notes.includes('low volume') || notes.includes('specific')) {
+    return 'Long-tail';
+  }
+
+  // Excluded tier patterns
+  if (notes.includes('exclude') || notes.includes('excluded') || notes.includes('filter') ||
+      notes.includes('remove') || notes.includes('negative') || notes.includes('blocked')) {
+    return 'Excluded';
+  }
+
+  // Default to Secondary for unrecognized notes
+  return 'Secondary';
+}
+
+/**
  * Parse M4: Listing Creation
  */
 function parseListingCreation(report: RawSLOReport): ListingCreationInput | undefined {
@@ -606,16 +715,22 @@ function parseListingCreation(report: RawSLOReport): ListingCreationInput | unde
     result.title = listing.title;
   }
 
+  // Handle both "bullets" and "bullet_points" field names
   if (listing.bullets && Array.isArray(listing.bullets)) {
     result.bullets = listing.bullets;
+  } else if (listing.bullet_points && Array.isArray(listing.bullet_points)) {
+    result.bullets = listing.bullet_points;
   }
 
   if (listing.description) {
     result.description = listing.description;
   }
 
+  // Handle both "backend_terms" and "backend_search_terms" field names
   if (listing.backend_terms) {
     result.backend_terms = listing.backend_terms;
+  } else if (listing.backend_search_terms) {
+    result.backend_terms = listing.backend_search_terms;
   }
 
   // Extract primary keywords from M3 data
