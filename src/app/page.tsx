@@ -6,6 +6,8 @@ import { PipelineView } from '@/components/PipelineView';
 import { StatsDashboard } from '@/components/StatsDashboard';
 import { VerificationResult } from '@/lib/types';
 import { AsinList, AsinSummary } from '@/components/AsinList';
+import { TrendsChart } from '@/components/TrendsChart';
+import { HistoricalStats } from '@/components/HistoricalStats';
 
 type LoadingState = 'loading' | 'loaded' | 'error' | 'not_configured';
 
@@ -81,6 +83,19 @@ export default function Dashboard() {
       setStats(data.stats || null);
       setLastUpdated(data.meta?.timestamp || new Date().toISOString());
       setLoadingState('loaded');
+
+      // Record historical data
+      if (data.reports && data.reports.length > 0) {
+        try {
+          await fetch('/api/history/record', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reports: data.reports }),
+          });
+        } catch (err) {
+          console.warn('Failed to record historical data:', err);
+        }
+      }
 
       // Auto-select first ASIN if available
       if (data.reports && data.reports.length > 0 && !selectedAsin) {
@@ -313,6 +328,12 @@ export default function Dashboard() {
                 onCheckClick={handleCheckClick}
               />
             )}
+
+            {/* Historical Trends */}
+            <div className="space-y-6">
+              <HistoricalStats days={30} />
+              <TrendsChart days={30} />
+            </div>
 
             {/* Two Column Layout: ASIN List + Detail View */}
             <div className="flex gap-8">

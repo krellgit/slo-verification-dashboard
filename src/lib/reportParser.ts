@@ -465,13 +465,26 @@ function parseCustomerIntent(report: RawSLOReport): CustomerIntentInput | undefi
     return undefined;
   }
 
-  return {
-    themes: themes.map((t: RawIntentTheme, idx: number) => ({
+  // Map and normalize themes
+  const mappedThemes = themes.map((t: RawIntentTheme, idx: number) => {
+    const rawQuotes = t.desires || t.quotes || (t as any).questions || [];
+    const quotes = Array.isArray(rawQuotes) ? rawQuotes.slice(0, 10) : [];  // Max 10 quotes
+
+    return {
       id: `theme_${idx + 1}`,
       name: normalizeThemeName(t.name || t.theme_name || `Theme ${idx + 1}`),
-      score: t.importance_score ?? t.score,
-      quotes: t.desires || t.quotes || (t as any).questions || [],
-    })),
+      score: t.importance_score ?? t.score ?? 0,
+      quotes,
+    };
+  });
+
+  // Sort by score descending and take top 10 themes
+  const sortedThemes = mappedThemes
+    .sort((a, b) => (b.score || 0) - (a.score || 0))
+    .slice(0, 10);
+
+  return {
+    themes: sortedThemes,
   };
 }
 
