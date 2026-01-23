@@ -2,6 +2,67 @@
 
 ---
 
+## SLOVD-005 - 2026-01-23T20:15:00+08:00
+
+**Summary:** Redis caching + password protection + M2 fix
+
+**Goal:** Fix historical tracking persistence, add performance caching, implement site-wide password protection, remove raw_list competitor checks, and redesign dashboard layout
+
+**Status:** Complete
+
+**Changes:**
+1. Fixed historical tracking by switching from Vercel KV to ioredis (using existing Redis Cloud instance)
+2. Added 5-minute Redis caching for reports API to reduce S3 load with multiple users
+3. Implemented once-per-day historical recording (skips if already recorded)
+4. Added site-wide password protection (password: FPAI, 7-day session)
+5. Removed M2 raw_list checks (M2-02, M2-03) - now only validates trimmed_list and final_list
+6. Redesigned dashboard to two-column layout (stats left, trends right)
+7. Added /ro rollout dashboard page for separate project
+
+**Files created:**
+1. src/lib/redis.ts - Redis client singleton using ioredis
+2. src/middleware.ts - Auth middleware protecting all routes except /login
+3. src/app/api/site/auth/route.ts - Site-level authentication API
+4. src/app/login/page.tsx - Password login page
+5. src/app/ro/page.tsx - Rollout dashboard for separate project
+
+**Files modified:**
+1. src/app/api/history/record/route.ts - Switch to ioredis, add once-per-day check
+2. src/app/api/history/trends/route.ts - Switch to ioredis, add debug mode
+3. src/app/api/reports/route.ts - Add 5-minute Redis caching
+4. src/lib/checks/m1m2Checks.ts - Remove raw_list checks, renumber M2-02 through M2-06
+5. src/lib/modules.ts - Update M2 check definitions (6 checks instead of 8)
+6. src/app/page.tsx - Two-column layout for stats/trends
+7. src/components/StatsDashboard.tsx - Compact 2x2 card grid, stacked modules
+
+**Commits:**
+1. c18de01 - Add site-wide password protection
+2. 6ee6ca5 - Add Redis caching for reports and once-per-day history recording
+3. aa16da5 - Remove raw_list checks from M2 Competitor Discovery
+4. edd6bf3 - Redesign dashboard layout to two-column view
+5. 4f0da5f - Switch historical tracking from Vercel KV to ioredis
+6. dea17e0 - Add /rollout page with status dashboard and presentation slides
+
+**Key decisions:**
+1. Redis over Vercel KV: Existing Redis Cloud instance was already configured but unused - ioredis connects directly vs KV's REST API requirement
+2. 5-minute cache TTL: Balances freshness with performance - multiple users won't spam S3
+3. Once-per-day recording: First visitor triggers recording, subsequent visits skip - prevents redundant writes
+4. Site password in code: Simple approach for internal tool - password "FPAI" hardcoded in auth route
+5. 7-day session: Long enough for convenience, short enough for security rotation
+6. M2 raw_list removal: Raw list validation not needed - only trimmed and final lists matter for quality
+7. Two-column layout: Stats on left, trends on right - better use of horizontal space, less scrolling
+
+**Blockers:** None
+
+**Next steps:**
+1. Consider separate password for /ro if needed
+2. Accumulate real historical data by visiting dashboard daily
+3. Monitor Redis usage and adjust cache TTL if needed
+4. Add logout button to dashboard header
+5. Consider environment variable for site password instead of hardcoded
+
+---
+
 ## SLOVD-004 - 2026-01-23T12:45:00+08:00
 
 **Summary:** UI redesign + parser fixes + historical tracking
