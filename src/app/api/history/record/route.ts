@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { reports, date } = body;
+    const { reports, date, force } = body;
 
     if (!reports || !Array.isArray(reports)) {
       return NextResponse.json(
@@ -27,6 +27,26 @@ export async function POST(request: NextRequest) {
 
     // Store in Redis or fallback to memory
     const redis = getRedisClient();
+
+    // Check if today's data already exists (skip if not forcing)
+    if (redis && !force) {
+      try {
+        const existing = await redis.get(key);
+        if (existing) {
+          return NextResponse.json({
+            success: true,
+            date: stats.date,
+            passRate: stats.passRate,
+            stored: 'redis',
+            skipped: true,
+            message: 'Data already recorded for today',
+          });
+        }
+      } catch (checkErr) {
+        console.warn('[History Record] Check existing failed:', checkErr);
+      }
+    }
+
     if (redis) {
       await redis.set(key, JSON.stringify(stats));
       // Set 90-day expiration
@@ -40,6 +60,7 @@ export async function POST(request: NextRequest) {
       date: stats.date,
       passRate: stats.passRate,
       stored: redis ? 'redis' : 'memory',
+      skipped: false,
     });
   } catch (error) {
     console.error('[History Record] Error:', error);

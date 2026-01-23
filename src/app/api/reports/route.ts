@@ -6,16 +6,53 @@ import { parseReport } from '@/lib/reportParser';
 import { verify } from '@/lib/verificationEngine';
 import { aggregateStats } from '@/lib/statsAggregator';
 import { VerificationResult } from '@/lib/types';
+import { getRedisClient } from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+// Cache key and TTL (5 minutes)
+const CACHE_KEY = 'reports:cached';
+const CACHE_TTL = 5 * 60; // 5 minutes in seconds
+
+interface CachedReportsData {
+  reports: VerificationResult[];
+  stats: ReturnType<typeof aggregateStats>;
+  errors?: Array<{ asin: string; error: string }>;
+  meta: {
+    totalFiles: number;
+    processedFiles: number;
+    failedFiles: number;
+    timestamp: string;
+    source: string;
+  };
+}
+
 /**
  * GET /api/reports - Get all reports with verification results
  * Public endpoint - uses server-side config (GitHub or S3)
+ * Results are cached in Redis for 5 minutes
  */
 export async function GET() {
   try {
+    // Try to get cached data first
+    const redis = getRedisClient();
+    if (redis) {
+      try {
+        const cached = await redis.get(CACHE_KEY);
+        if (cached) {
+          const data: CachedReportsData = JSON.parse(cached);
+          return NextResponse.json({
+            configured: true,
+            ...data,
+            cached: true,
+          });
+        }
+      } catch (cacheErr) {
+        console.warn('[Reports] Cache read failed:', cacheErr);
+      }
+    }
+
     const config = await getServerConfig();
 
     if (!config) {
@@ -86,8 +123,7 @@ export async function GET() {
     // Aggregate statistics
     const stats = aggregateStats(verificationResults);
 
-    return NextResponse.json({
-      configured: true,
+    const responseData: CachedReportsData = {
       reports: verificationResults,
       stats,
       errors: errors.length > 0 ? errors : undefined,
@@ -98,6 +134,22 @@ export async function GET() {
         timestamp: new Date().toISOString(),
         source: config.source,
       },
+    };
+
+    // Cache the results in Redis
+    if (redis) {
+      try {
+        await redis.set(CACHE_KEY, JSON.stringify(responseData));
+        await redis.expire(CACHE_KEY, CACHE_TTL);
+      } catch (cacheErr) {
+        console.warn('[Reports] Cache write failed:', cacheErr);
+      }
+    }
+
+    return NextResponse.json({
+      configured: true,
+      ...responseData,
+      cached: false,
     });
   } catch (error) {
     console.error('Reports API error:', error);
