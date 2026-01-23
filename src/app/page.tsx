@@ -321,18 +321,23 @@ export default function Dashboard() {
         {/* Loaded State with Data */}
         {loadingState === 'loaded' && reports.length > 0 && (
           <div className="max-w-full mx-auto px-6 py-8 space-y-8">
-            {/* Stats Dashboard */}
-            {dashboardStats && (
-              <StatsDashboard
-                stats={dashboardStats}
-                onCheckClick={handleCheckClick}
-              />
-            )}
+            {/* Two Column Layout: Stats on Left, Trends on Right */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {/* Left Column - Stats */}
+              <div className="space-y-6">
+                {dashboardStats && (
+                  <StatsDashboard
+                    stats={dashboardStats}
+                    onCheckClick={handleCheckClick}
+                  />
+                )}
+              </div>
 
-            {/* Historical Trends */}
-            <div className="space-y-6">
-              <HistoricalStats days={30} />
-              <TrendsChart days={30} />
+              {/* Right Column - Trends & Chart */}
+              <div className="space-y-6">
+                <TrendsChart days={30} />
+                <HistoricalStats days={30} />
+              </div>
             </div>
 
             {/* Two Column Layout: ASIN List + Detail View */}

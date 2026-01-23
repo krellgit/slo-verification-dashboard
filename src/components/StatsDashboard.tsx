@@ -72,15 +72,15 @@ function SummaryCard({
   };
 
   return (
-    <div className={`rounded-xl border-2 p-6 transition-all duration-200 hover:scale-105 ${variantStyles[variant]}`}>
+    <div className={`rounded-xl border-2 p-4 transition-all duration-200 hover:scale-102 ${variantStyles[variant]}`}>
       <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm text-slate-600 font-semibold uppercase tracking-wide">{label}</p>
-          <p className={`text-3xl font-bold mt-2 ${valueStyles[variant]}`}>{value}</p>
-          {subtext && <p className="text-xs text-slate-500 mt-2">{subtext}</p>}
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-slate-600 font-semibold uppercase tracking-wide truncate">{label}</p>
+          <p className={`text-2xl font-bold mt-1 ${valueStyles[variant]}`}>{value}</p>
+          {subtext && <p className="text-xs text-slate-500 mt-1 truncate">{subtext}</p>}
         </div>
         {icon && (
-          <div className={`ml-4 p-3 rounded-lg bg-white/50 ${iconStyles[variant]}`}>
+          <div className={`ml-2 p-2 rounded-lg bg-white/50 flex-shrink-0 ${iconStyles[variant]}`}>
             {icon}
           </div>
         )}
@@ -149,14 +149,14 @@ export function StatsDashboard({ stats, onCheckClick }: StatsDashboardProps) {
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Summary Cards - 2x2 Grid */}
+      <div className="grid grid-cols-2 gap-4">
         <SummaryCard
           label="Total ASINs"
           value={stats.totalAsins}
-          subtext={`${stats.totalChecks} total checks`}
+          subtext={`${stats.totalChecks} checks`}
           icon={
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
           }
@@ -167,29 +167,29 @@ export function StatsDashboard({ stats, onCheckClick }: StatsDashboardProps) {
           variant={stats.overallPassRate >= 90 ? 'success' : stats.overallPassRate >= 70 ? 'warning' : 'danger'}
           subtext={`${stats.totalPassed} passed`}
           icon={
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
           }
         />
         <SummaryCard
-          label="Failed Checks"
+          label="Failed"
           value={stats.totalFailed}
           variant={stats.totalFailed === 0 ? 'success' : 'danger'}
-          subtext={stats.totalFailed > 0 ? 'Requires attention' : 'All clear'}
+          subtext={stats.totalFailed > 0 ? 'Needs attention' : 'All clear'}
           icon={
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           }
         />
         <SummaryCard
-          label="Needs Review"
+          label="Review"
           value={stats.totalReview}
           variant={stats.totalReview === 0 ? 'default' : 'warning'}
-          subtext={stats.totalReview > 0 ? 'Manual review needed' : 'None pending'}
+          subtext={stats.totalReview > 0 ? 'Manual review' : 'None pending'}
           icon={
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
@@ -197,15 +197,15 @@ export function StatsDashboard({ stats, onCheckClick }: StatsDashboardProps) {
         />
       </div>
 
-      {/* Two Column Layout: Module Performance & Top Failures */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Module Performance & Top Failures - Stacked */}
+      <div className="space-y-4">
         {/* Module Performance */}
-        <div className="bg-white rounded-xl border-2 border-slate-200 p-6 shadow-md">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="bg-white rounded-xl border-2 border-slate-200 p-4 shadow-md">
+          <div className="flex items-center gap-2 mb-3">
+            <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
             </svg>
-            <h3 className="text-lg font-bold text-slate-900">Module Performance</h3>
+            <h3 className="text-sm font-bold text-slate-900">Module Performance</h3>
           </div>
           {sortedModules.length === 0 ? (
             <p className="text-sm text-slate-500">No module data available</p>
@@ -224,12 +224,12 @@ export function StatsDashboard({ stats, onCheckClick }: StatsDashboardProps) {
         </div>
 
         {/* Top Failing Checks */}
-        <div className="bg-white rounded-xl border-2 border-slate-200 p-6 shadow-md">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="bg-white rounded-xl border-2 border-slate-200 p-4 shadow-md">
+          <div className="flex items-center gap-2 mb-3">
+            <svg className="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <h3 className="text-lg font-bold text-slate-900">Top Failing Checks</h3>
+            <h3 className="text-sm font-bold text-slate-900">Top Failing Checks</h3>
           </div>
           {stats.topFailingChecks.length === 0 ? (
             <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 p-4 rounded-lg">
