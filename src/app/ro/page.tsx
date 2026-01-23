@@ -280,7 +280,7 @@ export default function RolloutPage() {
             }`}>
               <p className="text-white/80 text-sm font-medium flex items-center">
                 Failure Rate
-                <Tooltip text="% of quality checks failing. Lower = better. Green when <5%." />
+                <Tooltip text="Quality check failures. Under 5% = ready for launch." />
               </p>
               <p className="text-4xl font-bold mt-1">{loading ? '...' : `${currentFailureRate}%`}</p>
               <p className="text-white/70 text-sm mt-1">Target: &lt;5%</p>
