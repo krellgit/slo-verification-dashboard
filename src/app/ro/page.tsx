@@ -127,12 +127,15 @@ export default function RolloutPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.stats) {
+            // Use check-level pass rate (passedChecks / totalChecks) instead of ASIN-level
+            // This gives a more accurate picture of progress since one failing check
+            // would otherwise mark an entire ASIN as failed
             setLiveStats({
               totalAsins: data.stats.totalAsins || 50,
-              passedAsins: data.stats.passedAsins || 25,
-              passRate: data.stats.totalAsins > 0
-                ? Math.round((data.stats.passedAsins / data.stats.totalAsins) * 100)
-                : 50,
+              passedAsins: data.stats.passedAsins || 0,
+              passRate: data.stats.totalChecks > 0
+                ? Math.round((data.stats.passedChecks / data.stats.totalChecks) * 100)
+                : 0,
             });
           }
         }
