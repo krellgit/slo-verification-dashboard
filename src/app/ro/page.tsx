@@ -466,7 +466,7 @@ export default function RolloutPage() {
                 </div>
               </a>
               <a
-                href="https://github.com/krellgit/slo-verification-dashboard"
+                href="https://slovd.krell.works"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
