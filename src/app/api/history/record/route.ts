@@ -3,16 +3,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateDailyStats, getDailyStatsKey, type DailyStats } from '@/lib/history';
+import { getRedisClient } from '@/lib/redis';
 
-// Try to import Vercel KV, fallback to in-memory storage
-let kv: any = null;
-try {
-  kv = require('@vercel/kv').kv;
-} catch {
-  console.warn('[History] Vercel KV not available, using in-memory storage (data will not persist)');
-}
-
-// In-memory fallback (only for development/testing)
+// In-memory fallback (only for development/testing when Redis unavailable)
 const memoryStore = new Map<string, DailyStats>();
 
 export async function POST(request: NextRequest) {
@@ -32,11 +25,12 @@ export async function POST(request: NextRequest) {
     const stats = calculateDailyStats(reports, date);
     const key = getDailyStatsKey(stats.date);
 
-    // Store in KV or fallback
-    if (kv) {
-      await kv.set(key, stats);
+    // Store in Redis or fallback to memory
+    const redis = getRedisClient();
+    if (redis) {
+      await redis.set(key, JSON.stringify(stats));
       // Set 90-day expiration
-      await kv.expire(key, 90 * 24 * 60 * 60);
+      await redis.expire(key, 90 * 24 * 60 * 60);
     } else {
       memoryStore.set(key, stats);
     }
@@ -45,7 +39,7 @@ export async function POST(request: NextRequest) {
       success: true,
       date: stats.date,
       passRate: stats.passRate,
-      stored: kv ? 'kv' : 'memory',
+      stored: redis ? 'redis' : 'memory',
     });
   } catch (error) {
     console.error('[History Record] Error:', error);
@@ -64,8 +58,10 @@ export async function GET(request: NextRequest) {
 
     let stats: DailyStats | null = null;
 
-    if (kv) {
-      stats = await kv.get(key);
+    const redis = getRedisClient();
+    if (redis) {
+      const data = await redis.get(key);
+      stats = data ? JSON.parse(data) : null;
     } else {
       stats = memoryStore.get(key) || null;
     }

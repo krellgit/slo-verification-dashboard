@@ -3,14 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDateRangeKeys, formatTrendData, calculateHistoricalSummary, type DailyStats } from '@/lib/history';
-
-// Try to import Vercel KV
-let kv: any = null;
-try {
-  kv = require('@vercel/kv').kv;
-} catch {
-  console.warn('[History] Vercel KV not available');
-}
+import { getRedisClient } from '@/lib/redis';
 
 // In-memory fallback
 const memoryStore = new Map<string, DailyStats>();
@@ -20,6 +13,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '30', 10);
     const asinFilter = searchParams.get('asin');
+    const debug = searchParams.get('debug') === 'true';
 
     if (days < 1 || days > 365) {
       return NextResponse.json(
@@ -33,14 +27,28 @@ export async function GET(request: NextRequest) {
 
     // Fetch all data
     const dailyStats: DailyStats[] = [];
+    const debugInfo: { redisAvailable: boolean; keysChecked: string[]; foundKeys: string[]; errors: string[] } = {
+      redisAvailable: false,
+      keysChecked: keys.slice(0, 7), // Show first 7 keys for debugging
+      foundKeys: [],
+      errors: [],
+    };
 
-    if (kv) {
-      // Batch fetch from KV
+    const redis = getRedisClient();
+    debugInfo.redisAvailable = !!redis;
+
+    if (redis) {
+      // Batch fetch from Redis
       const results = await Promise.all(
         keys.map(async key => {
           try {
-            return await kv.get(key);
-          } catch {
+            const data = await redis.get(key);
+            if (data) {
+              debugInfo.foundKeys.push(key);
+            }
+            return data ? JSON.parse(data) : null;
+          } catch (err) {
+            debugInfo.errors.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
             return null;
           }
         })
@@ -51,7 +59,17 @@ export async function GET(request: NextRequest) {
       // Fetch from memory
       keys.forEach(key => {
         const stat = memoryStore.get(key);
-        if (stat) dailyStats.push(stat);
+        if (stat) {
+          dailyStats.push(stat);
+          debugInfo.foundKeys.push(key);
+        }
+      });
+    }
+
+    if (debug) {
+      return NextResponse.json({
+        debug: debugInfo,
+        dailyStatsCount: dailyStats.length,
       });
     }
 
