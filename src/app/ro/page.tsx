@@ -353,8 +353,8 @@ export default function RolloutPage() {
           </div>
 
           {/* Phase Timeline */}
-          <div className="bg-white rounded-xl border-2 border-slate-200 p-6 mb-8 shadow-md">
-            <h2 className="text-lg font-semibold text-slate-900 mb-6 flex items-center">
+          <div className="bg-white rounded-xl border-2 border-slate-200 p-6 mb-8 shadow-lg">
+            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
               7-Day Rollout Timeline
               <Tooltip text="6 phases over 8 days. Yellow = in progress, green = done, blue = scheduled." />
             </h2>
@@ -364,12 +364,12 @@ export default function RolloutPage() {
                   key={phase.id}
                   className={`border-2 rounded-lg p-4 transition-all ${
                     phase.status === 'in_progress'
-                      ? 'border-amber-300 bg-amber-50'
+                      ? 'border-amber-400 bg-amber-100 shadow-md shadow-amber-100'
                       : phase.status === 'complete'
-                      ? 'border-emerald-300 bg-emerald-50'
+                      ? 'border-emerald-400 bg-emerald-100 shadow-md shadow-emerald-100'
                       : phase.status === 'scheduled'
-                      ? 'border-blue-300 bg-blue-50'
-                      : 'border-slate-200 bg-white'
+                      ? 'border-blue-400 bg-blue-100 shadow-md shadow-blue-100'
+                      : 'border-slate-300 bg-slate-50'
                   }`}
                 >
                   <div className="flex items-start justify-between">
@@ -377,37 +377,43 @@ export default function RolloutPage() {
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${getStatusColor(phase.status)}`}>
                         {phase.status === 'complete' ? '✓' : index + 1}
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <div className="flex items-center gap-3">
-                          <h3 className="font-semibold text-slate-900">{phase.name}</h3>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(phase.status)}`}>
+                          <h3 className="font-bold text-slate-900 text-lg">{phase.name}</h3>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${getStatusBadge(phase.status)}`}>
                             {phase.status === 'in_progress' ? 'In Progress' :
                              phase.status === 'complete' ? 'Complete' :
                              phase.status === 'scheduled' ? 'Scheduled' : 'Pending'}
                           </span>
                         </div>
-                        <p className="text-sm text-slate-500 mt-1">
+                        <p className="text-sm text-slate-600 mt-1 font-medium">
                           {phase.days} ({phase.dates}) • Target: {phase.target}
                         </p>
-                        {phase.tasks && phase.status === 'in_progress' && (
+                        {phase.tasks && (
                           <div className="mt-3 space-y-2">
                             {phase.tasks.map((task, i) => (
                               <div key={i} className="flex items-center gap-2 text-sm">
-                                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
+                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0 ${
                                   task.status === 'complete' ? 'bg-emerald-500 text-white' :
                                   task.status === 'in_progress' ? 'bg-amber-500 text-white' :
-                                  'bg-slate-200 text-slate-500'
+                                  'bg-slate-300 text-slate-600'
                                 }`}>
-                                  {task.status === 'complete' ? '✓' : task.status === 'in_progress' ? '•' : ''}
+                                  {task.status === 'complete' ? '✓' : task.status === 'in_progress' ? '•' : '○'}
                                 </span>
-                                <span className={task.status === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}>
+                                <span className={
+                                  task.status === 'complete'
+                                    ? 'line-through text-slate-400'
+                                    : task.status === 'in_progress'
+                                    ? 'text-slate-900 font-semibold'
+                                    : 'text-slate-600'
+                                }>
                                   {task.name}
                                 </span>
                                 {'priority' in task && (
-                                  <span className="text-xs text-rose-600 font-medium">{task.priority}</span>
+                                  <span className="text-xs text-rose-600 font-bold bg-rose-100 px-1.5 py-0.5 rounded">{task.priority}</span>
                                 )}
                                 {'impact' in task && (
-                                  <span className="text-xs text-emerald-600 font-medium">{task.impact}</span>
+                                  <span className="text-xs text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">{task.impact}</span>
                                 )}
                               </div>
                             ))}
