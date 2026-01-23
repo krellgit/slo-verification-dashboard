@@ -2,6 +2,67 @@
 
 ---
 
+## SLOVD-004 - 2026-01-23T12:45:00+08:00
+
+**Summary:** UI redesign + parser fixes + historical tracking
+
+**Goal:** Complete UI modernization, fix JSON parsing errors for S3 data, implement historical pass rate tracking with trend visualization, and create comprehensive documentation for data team
+
+**Status:** Complete
+
+**Changes:**
+1. Complete UI redesign with modern gradients, icons, and improved spacing across all components
+2. Parser fixes for 13 JSON format inconsistencies (tier extraction, theme normalization, quote trimming)
+3. Historical tracking feature with trends chart and daily statistics
+4. Created 3 DOCX documentation files for data team
+5. Created Jira ticket PROD-3087 assigned to Yehor with all fix requirements
+6. Deployed all changes to https://slovd.krell.works
+
+**Files modified:**
+1. src/components/StatsDashboard.tsx - Modern gradient cards with icons
+2. src/components/CheckItem.tsx - Color-coded borders, enhanced expandable UI
+3. src/components/ModuleDetail.tsx - Improved header and status indicators
+4. src/components/PipelineView.tsx - Larger modules with animations
+5. src/components/AsinList.tsx - Redesigned cards, vertical list layout
+6. src/app/page.tsx - Dark header, historical trends integration
+7. src/app/admin/page.tsx - Enhanced dark theme aesthetics
+8. src/lib/reportParser.ts - Added extractTierFromNotes, normalizeThemeName, theme trimming
+9. src/lib/history.ts - Historical data recording and aggregation
+10. src/components/TrendsChart.tsx - SVG line chart for pass rate trends
+11. src/components/HistoricalStats.tsx - Trend summary cards
+12. src/app/api/history/record/route.ts - Historical data recording endpoint
+13. src/app/api/history/trends/route.ts - Trend data query endpoint
+
+**Commits:**
+1. 14264b1 - Add theme trimming and historical pass rate tracking
+2. 1ecdbbc - Comprehensive parser fixes for S3 JSON format inconsistencies
+3. cdca96b - Fix ASIN list layout for sidebar display
+4. 1897388 - Fix TypeScript errors: Change JSX.Element to React.ReactNode
+5. 13b6016 - Implement comprehensive UI redesign for SLO Verification Dashboard
+
+**Key decisions:**
+1. UI Design: Modern gradient-based design system with emerald/rose/amber/slate palette replacing basic colors - improves visual hierarchy and professional appearance
+2. Parser Strategy: Hybrid approach - fix parser to handle current JSON format while documenting output errors for data team - balances immediate functionality with long-term data quality
+3. Theme Normalization: Map invalid theme names (USAGE→EASE_OF_USE) rather than rejecting them - graceful degradation prevents dashboard crashes
+4. Theme Trimming: Sort by importance_score and take top 10 - fixes M2.1-01 error automatically without requiring output changes
+5. Historical Storage: Use Vercel KV with in-memory fallback - simple, cost-effective, no database setup required
+6. Tier Extraction: Parse tier_notes text using pattern matching (primary/secondary/long-tail keywords) - handles actual JSON structure vs expected enum
+7. Documentation Format: DOCX for data team compatibility - created markdown first then converted with python-docx
+8. Jira Integration: Used go-jira CLI with API token authentication - automated ticket creation assigned to Yehor
+9. Error Categorization: Divided into Parser Fixes (5 errors) vs Output Fixes (8 errors) - clear ownership and action items
+
+**Blockers:** None
+
+**Next steps:**
+1. Monitor dashboard for 3-5 days to accumulate historical trend data
+2. Yehor implements data generation fixes from PROD-3087 ticket
+3. Test with updated JSON files to verify pass rate improvement
+4. Consider adding per-module trend charts
+5. Add export functionality for historical data
+6. Plan additional parser validation rules if needed
+
+---
+
 ## SLOVD-003 - 2026-01-19T08:18:42+08:00
 
 **Summary:** GitHub integration + multi-ASIN dashboard with stats
