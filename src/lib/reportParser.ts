@@ -51,6 +51,17 @@ export interface RawSLOReport {
     }>;
     [key: string]: unknown;
   };
+  // S3 format: Title Case at root level
+  'Competitors Trimmed List'?: Array<{
+    asin: string;
+    relevance_score?: number;
+    [key: string]: unknown;
+  }>;
+  'Competitors Final List'?: Array<{
+    asin: string;
+    relevance_score?: number;
+    [key: string]: unknown;
+  }>;
 
   // M2.1: Intent themes (can be at root or nested)
   intent_themes?: RawIntentTheme[];
@@ -367,21 +378,16 @@ function parseCompetitorDiscovery(report: RawSLOReport): CompetitorDiscoveryInpu
     }
   }
 
+  // Check for competitors in both nested format and S3 Title Case format
+  const trimmedList = report.competitors?.trimmed_list || report['Competitors Trimmed List'];
+  const finalList = report.competitors?.final_list || report['Competitors Final List'];
+  const rawList = report.competitors?.raw_list;
+
   const hasSearchTerms = searchTerms && searchTerms.length > 0;
-  const hasCompetitors = report.competitors && (
-    report.competitors.raw_list ||
-    report.competitors.trimmed_list ||
-    report.competitors.final_list
-  );
+  const hasCompetitors = rawList || trimmedList || finalList;
 
   if (!hasSearchTerms && !hasCompetitors) {
     return undefined;
-  }
-
-  // Warn if competitors field is missing
-  if (!report.competitors) {
-    const asin = (report as any).ASIN || (report as any).asin || 'unknown';
-    console.warn(`[M2 Parser] Missing competitors field for ASIN ${asin} - CompetitorDiscoveryInput will be incomplete`);
   }
 
   const result: CompetitorDiscoveryInput = {};
@@ -390,16 +396,14 @@ function parseCompetitorDiscovery(report: RawSLOReport): CompetitorDiscoveryInpu
     result.search_terms = searchTerms;
   }
 
-  if (report.competitors) {
-    if (report.competitors.raw_list) {
-      result.raw_list = report.competitors.raw_list;
-    }
-    if (report.competitors.trimmed_list) {
-      result.trimmed_list = report.competitors.trimmed_list;
-    }
-    if (report.competitors.final_list) {
-      result.final_list = report.competitors.final_list;
-    }
+  if (rawList) {
+    result.raw_list = rawList;
+  }
+  if (trimmedList) {
+    result.trimmed_list = trimmedList;
+  }
+  if (finalList) {
+    result.final_list = finalList;
   }
 
   return result;
