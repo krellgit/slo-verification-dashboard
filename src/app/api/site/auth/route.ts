@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const SITE_PASSWORD = 'FPAI';
+const SITE_PASSWORD = process.env.SITE_PASSWORD;
 const SITE_SESSION_COOKIE = 'slovd_site_session';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (password !== SITE_PASSWORD) {
+    if (!SITE_PASSWORD || password !== SITE_PASSWORD) {
       return NextResponse.json(
         { error: 'Invalid password' },
         { status: 401 }
