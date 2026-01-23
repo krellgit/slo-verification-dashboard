@@ -23,13 +23,11 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     dependsOn: ['M1'],
     checks: [
       { id: 'M2-01', name: 'Search terms count', rule: 'Exactly 5 terms', failMessage: 'Need exactly 5 search terms' },
-      { id: 'M2-02', name: 'Raw list size', rule: '40-50 items', failMessage: 'Raw list size out of range' },
-      { id: 'M2-03', name: 'No duplicates', rule: 'All ASINs unique', failMessage: 'Duplicate ASIN found' },
-      { id: 'M2-04', name: 'Trimmed list size', rule: '15-20 items', failMessage: 'Trimmed list size out of range' },
-      { id: 'M2-05', name: 'All have scores', rule: 'Every item has relevance_score', failMessage: 'Missing score' },
-      { id: 'M2-06', name: 'Final list size', rule: '5-10 items', failMessage: 'Final list size out of range' },
-      { id: 'M2-07', name: 'Final from trimmed', rule: 'All final items exist in trimmed', failMessage: 'Selection not in trimmed list' },
-      { id: 'M2-08', name: 'ASINs valid format', rule: 'All match B0[A-Z0-9]{8}', failMessage: 'Invalid ASIN format' },
+      { id: 'M2-02', name: 'Trimmed list size', rule: '15-20 items', failMessage: 'Trimmed list size out of range' },
+      { id: 'M2-03', name: 'All have scores', rule: 'Every item has relevance_score', failMessage: 'Missing score' },
+      { id: 'M2-04', name: 'Final list size', rule: '5-10 items', failMessage: 'Final list size out of range' },
+      { id: 'M2-05', name: 'Final from trimmed', rule: 'All final items exist in trimmed', failMessage: 'Selection not in trimmed list' },
+      { id: 'M2-06', name: 'ASINs valid format', rule: 'All match B0[A-Z0-9]{8}', failMessage: 'Invalid ASIN format' },
     ]
   },
   {

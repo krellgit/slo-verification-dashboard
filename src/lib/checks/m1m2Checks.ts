@@ -167,7 +167,8 @@ export function verifyM1(input: ProductContextInput, bannedTerms?: string[]): Ch
 }
 
 /**
- * Verify M2: Competitor Discovery (8 checks)
+ * Verify M2: Competitor Discovery (6 checks)
+ * Note: raw_list checks removed - only trimmed_list and final_list are validated
  */
 export function verifyM2(input: CompetitorDiscoveryInput): CheckResult[] {
   const results: CheckResult[] = [];
@@ -193,55 +194,11 @@ export function verifyM2(input: CompetitorDiscoveryInput): CheckResult[] {
     })
   });
 
-  // M2-02: raw_list.length 40-50
-  const rawList = input.raw_list ?? [];
-  const rawListInRange = rawList.length >= 40 && rawList.length <= 50;
-  results.push({
-    id: 'M2-02',
-    name: 'Raw list count',
-    status: rawListInRange ? 'PASS' : 'FAIL',
-    detail: `Found ${rawList.length} items`,
-    ...((!rawListInRange) && {
-      issue: {
-        item: 'raw_list',
-        expected: '40-50 items',
-        actual: `${rawList.length} items`,
-        reason: 'Raw list must contain 40-50 competitor ASINs'
-      },
-      actions: rawList.length < 40
-        ? [`Add ${40 - rawList.length} more items to reach minimum of 40`]
-        : [`Remove ${rawList.length - 50} items to stay within maximum of 50`]
-    })
-  });
-
-  // M2-03: No duplicate ASINs in raw_list
-  const rawAsins = rawList.map(item => item.asin);
-  const uniqueRawAsins = new Set(rawAsins);
-  const duplicateRawAsins = rawAsins.filter((asin, index) => rawAsins.indexOf(asin) !== index);
-  const noDuplicates = duplicateRawAsins.length === 0;
-  results.push({
-    id: 'M2-03',
-    name: 'No duplicate ASINs in raw list',
-    status: noDuplicates ? 'PASS' : 'FAIL',
-    detail: noDuplicates
-      ? `All ${rawList.length} ASINs unique`
-      : `${duplicateRawAsins.length} duplicates found`,
-    ...((!noDuplicates) && {
-      issue: {
-        item: 'raw_list',
-        expected: 'All unique ASINs',
-        actual: `Duplicates: ${Array.from(new Set(duplicateRawAsins)).slice(0, 5).join(', ')}${duplicateRawAsins.length > 5 ? '...' : ''}`,
-        reason: 'Each competitor should appear only once in raw list'
-      },
-      actions: ['Remove duplicate ASIN entries from raw_list']
-    })
-  });
-
-  // M2-04: trimmed_list.length 15-20
+  // M2-02: trimmed_list.length 15-20
   const trimmedList = input.trimmed_list ?? [];
   const trimmedInRange = trimmedList.length >= 15 && trimmedList.length <= 20;
   results.push({
-    id: 'M2-04',
+    id: 'M2-02',
     name: 'Trimmed list count',
     status: trimmedInRange ? 'PASS' : 'FAIL',
     detail: `Found ${trimmedList.length} items`,
@@ -258,13 +215,13 @@ export function verifyM2(input: CompetitorDiscoveryInput): CheckResult[] {
     })
   });
 
-  // M2-05: Every trimmed item has relevance_score
+  // M2-03: Every trimmed item has relevance_score
   const trimmedWithoutScore = trimmedList.filter(item =>
     item.relevance_score === undefined || item.relevance_score === null
   );
   const allTrimmedHaveScore = trimmedList.length === 0 || trimmedWithoutScore.length === 0;
   results.push({
-    id: 'M2-05',
+    id: 'M2-03',
     name: 'Trimmed items have relevance scores',
     status: allTrimmedHaveScore ? 'PASS' : 'FAIL',
     detail: trimmedList.length === 0
@@ -283,11 +240,11 @@ export function verifyM2(input: CompetitorDiscoveryInput): CheckResult[] {
     })
   });
 
-  // M2-06: final_list.length 5-10
+  // M2-04: final_list.length 5-10
   const finalList = input.final_list ?? [];
   const finalInRange = finalList.length >= 5 && finalList.length <= 10;
   results.push({
-    id: 'M2-06',
+    id: 'M2-04',
     name: 'Final list count',
     status: finalInRange ? 'PASS' : 'FAIL',
     detail: `Found ${finalList.length} items`,
@@ -304,13 +261,13 @@ export function verifyM2(input: CompetitorDiscoveryInput): CheckResult[] {
     })
   });
 
-  // M2-07: All final ASINs exist in trimmed
+  // M2-05: All final ASINs exist in trimmed
   const trimmedAsins = new Set(trimmedList.map(item => item.asin));
   const finalAsins = finalList.map(item => item.asin);
   const finalNotInTrimmed = finalAsins.filter(asin => !trimmedAsins.has(asin));
   const allFinalInTrimmed = finalNotInTrimmed.length === 0;
   results.push({
-    id: 'M2-07',
+    id: 'M2-05',
     name: 'Final ASINs exist in trimmed list',
     status: allFinalInTrimmed ? 'PASS' : 'FAIL',
     detail: allFinalInTrimmed
@@ -327,16 +284,15 @@ export function verifyM2(input: CompetitorDiscoveryInput): CheckResult[] {
     })
   });
 
-  // M2-08: All ASINs match /^B0[A-Z0-9]{8}$/
+  // M2-06: All ASINs in trimmed and final lists match /^B0[A-Z0-9]{8}$/
   const allAsins = [
-    ...rawAsins,
     ...trimmedList.map(item => item.asin),
     ...finalAsins
   ];
   const invalidAsins = allAsins.filter(asin => !ASIN_PATTERN.test(asin));
   const allAsinsValid = invalidAsins.length === 0;
   results.push({
-    id: 'M2-08',
+    id: 'M2-06',
     name: 'Valid ASIN format',
     status: allAsinsValid ? 'PASS' : 'FAIL',
     detail: allAsinsValid
