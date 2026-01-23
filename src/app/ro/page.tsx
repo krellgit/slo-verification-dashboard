@@ -104,8 +104,9 @@ const TEAM = [
 
 interface LiveStats {
   totalAsins: number;
-  passedAsins: number;
-  passRate: number;
+  failedChecks: number;
+  totalChecks: number;
+  failureRate: number;
 }
 
 export default function RolloutPage() {
@@ -127,14 +128,16 @@ export default function RolloutPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.stats) {
-            // Use check-level pass rate (passedChecks / totalChecks) instead of ASIN-level
-            // This gives a more accurate picture of progress since one failing check
-            // would otherwise mark an entire ASIN as failed
+            // Use failure rate (failedChecks / totalChecks) - more actionable metric
+            // Shows what needs to be fixed rather than what's already working
+            const totalChecks = data.stats.totalChecks || 0;
+            const failedChecks = data.stats.failedChecks || 0;
             setLiveStats({
-              totalAsins: data.stats.totalAsins || 50,
-              passedAsins: data.stats.passedAsins || 0,
-              passRate: data.stats.totalChecks > 0
-                ? Math.round((data.stats.passedChecks / data.stats.totalChecks) * 100)
+              totalAsins: data.stats.totalAsins || 0,
+              failedChecks,
+              totalChecks,
+              failureRate: totalChecks > 0
+                ? Math.round((failedChecks / totalChecks) * 100)
                 : 0,
             });
           }
@@ -148,8 +151,10 @@ export default function RolloutPage() {
     fetchStats();
   }, []);
 
-  const currentPassRate = liveStats?.passRate ?? 50;
-  const totalAsins = liveStats?.totalAsins ?? 50;
+  const currentFailureRate = liveStats?.failureRate ?? 0;
+  const totalAsins = liveStats?.totalAsins ?? 0;
+  const failedChecks = liveStats?.failedChecks ?? 0;
+  const totalChecks = liveStats?.totalChecks ?? 0;
 
   // Calculate overall completion
   const overallCompletion = Math.round(
@@ -245,17 +250,17 @@ export default function RolloutPage() {
               </div>
             </div>
 
-            {/* Current Pass Rate */}
+            {/* Current Failure Rate */}
             <div className={`rounded-xl p-6 shadow-lg ${
-              currentPassRate >= 80
+              currentFailureRate <= 5
                 ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-emerald-200'
-                : currentPassRate >= 60
+                : currentFailureRate <= 10
                 ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-amber-200'
                 : 'bg-gradient-to-br from-rose-500 to-rose-600 text-white shadow-rose-200'
             }`}>
-              <p className="text-white/80 text-sm font-medium">Current Pass Rate</p>
-              <p className="text-4xl font-bold mt-1">{loading ? '...' : `${currentPassRate}%`}</p>
-              <p className="text-white/70 text-sm mt-1">Target: 80%+</p>
+              <p className="text-white/80 text-sm font-medium">Failure Rate</p>
+              <p className="text-4xl font-bold mt-1">{loading ? '...' : `${currentFailureRate}%`}</p>
+              <p className="text-white/70 text-sm mt-1">Target: &lt;5%</p>
             </div>
 
             {/* Days Remaining */}
@@ -273,43 +278,44 @@ export default function RolloutPage() {
             </div>
           </div>
 
-          {/* Pass Rate Progress */}
+          {/* Failure Rate Progress */}
           <div className="bg-white rounded-xl border-2 border-slate-200 p-6 mb-8 shadow-md">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">Pass Rate Progress</h2>
+            <h2 className="text-lg font-semibold text-slate-900 mb-4">Failure Rate Progress</h2>
+            <p className="text-sm text-slate-500 mb-4">{failedChecks} failed checks out of {totalChecks} total</p>
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-slate-600 w-24">Current</span>
-                <div className="flex-1 bg-slate-100 rounded-full h-4">
+                <span className="text-sm font-medium text-slate-600 w-28">Current</span>
+                <div className="flex-1 bg-slate-100 rounded-full h-4 relative">
                   <div
                     className={`h-4 rounded-full transition-all duration-500 ${
-                      currentPassRate >= 80 ? 'bg-emerald-500' :
-                      currentPassRate >= 60 ? 'bg-amber-500' : 'bg-rose-500'
+                      currentFailureRate <= 5 ? 'bg-emerald-500' :
+                      currentFailureRate <= 10 ? 'bg-amber-500' : 'bg-rose-500'
                     }`}
-                    style={{ width: `${currentPassRate}%` }}
+                    style={{ width: `${Math.min(currentFailureRate * 2, 100)}%` }}
                   />
                 </div>
-                <span className="text-sm font-bold text-slate-900 w-12">{currentPassRate}%</span>
+                <span className="text-sm font-bold text-slate-900 w-12">{currentFailureRate}%</span>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-slate-600 w-24">Day 2 Target</span>
+                <span className="text-sm font-medium text-slate-600 w-28">Day 2 Target</span>
                 <div className="flex-1 bg-slate-100 rounded-full h-4">
-                  <div className="bg-amber-300 h-4 rounded-full" style={{ width: '70%' }} />
+                  <div className="bg-amber-300 h-4 rounded-full" style={{ width: '20%' }} />
                 </div>
-                <span className="text-sm font-medium text-slate-500 w-12">70%</span>
+                <span className="text-sm font-medium text-slate-500 w-12">&lt;10%</span>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-slate-600 w-24">Day 3 Target</span>
+                <span className="text-sm font-medium text-slate-600 w-28">Day 3 Target</span>
                 <div className="flex-1 bg-slate-100 rounded-full h-4">
-                  <div className="bg-emerald-300 h-4 rounded-full" style={{ width: '80%' }} />
+                  <div className="bg-emerald-300 h-4 rounded-full" style={{ width: '14%' }} />
                 </div>
-                <span className="text-sm font-medium text-slate-500 w-12">80%</span>
+                <span className="text-sm font-medium text-slate-500 w-12">&lt;7%</span>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-slate-600 w-24">Launch Target</span>
+                <span className="text-sm font-medium text-slate-600 w-28">Launch Target</span>
                 <div className="flex-1 bg-slate-100 rounded-full h-4">
-                  <div className="bg-emerald-500 h-4 rounded-full" style={{ width: '85%' }} />
+                  <div className="bg-emerald-500 h-4 rounded-full" style={{ width: '10%' }} />
                 </div>
-                <span className="text-sm font-medium text-slate-500 w-12">85%</span>
+                <span className="text-sm font-medium text-slate-500 w-12">&lt;5%</span>
               </div>
             </div>
           </div>
@@ -506,7 +512,7 @@ export default function RolloutPage() {
         <SlidePresentation
           currentSlide={currentSlide}
           setCurrentSlide={setCurrentSlide}
-          passRate={currentPassRate}
+          failureRate={currentFailureRate}
           totalAsins={totalAsins}
           daysRemaining={daysRemaining}
           overallCompletion={overallCompletion}
@@ -527,14 +533,14 @@ export default function RolloutPage() {
 function SlidePresentation({
   currentSlide,
   setCurrentSlide,
-  passRate,
+  failureRate,
   totalAsins,
   daysRemaining,
   overallCompletion,
 }: {
   currentSlide: number;
   setCurrentSlide: (slide: number) => void;
-  passRate: number;
+  failureRate: number;
   totalAsins: number;
   daysRemaining: number;
   overallCompletion: number;
@@ -554,8 +560,8 @@ function SlidePresentation({
           <p className="text-slate-500 mt-2">Days Left</p>
         </div>
         <div className="text-center">
-          <p className={`text-6xl font-bold ${passRate >= 80 ? 'text-emerald-600' : passRate >= 60 ? 'text-amber-600' : 'text-rose-600'}`}>{passRate}%</p>
-          <p className="text-slate-500 mt-2">Pass Rate</p>
+          <p className={`text-6xl font-bold ${failureRate <= 5 ? 'text-emerald-600' : failureRate <= 10 ? 'text-amber-600' : 'text-rose-600'}`}>{failureRate}%</p>
+          <p className="text-slate-500 mt-2">Failure Rate</p>
         </div>
       </div>
       <p className="text-slate-400 mt-12">January 23-30, 2026</p>
@@ -578,7 +584,7 @@ function SlidePresentation({
             <h3 className="font-semibold text-amber-800 text-lg">🔧 In Progress</h3>
             <ul className="mt-3 space-y-2 text-amber-700">
               <li>• M2 Competitor Data Fix (Priority #1)</li>
-              <li>• Pass Rate: {passRate}% → Target 80%+</li>
+              <li>• Failure Rate: {failureRate}% → Target &lt;5%</li>
             </ul>
           </div>
         </div>
