@@ -3,6 +3,23 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+// Tooltip component for info icons
+function Tooltip({ text }: { text: string }) {
+  return (
+    <span className="relative group inline-flex items-center ml-1.5">
+      <span className="cursor-help text-slate-400 hover:text-slate-600 transition-colors">
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+        </svg>
+      </span>
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap max-w-xs text-center z-50 shadow-lg">
+        {text}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+      </span>
+    </span>
+  );
+}
+
 // Rollout phase data
 const PHASES = [
   {
@@ -240,7 +257,10 @@ export default function RolloutPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             {/* Overall Completion */}
             <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg shadow-indigo-200">
-              <p className="text-indigo-200 text-sm font-medium">Overall Completion</p>
+              <p className="text-indigo-200 text-sm font-medium flex items-center">
+                Overall Completion
+                <Tooltip text="Progress across all 6 phases. 100% = ready for launch." />
+              </p>
               <p className="text-4xl font-bold mt-1">{overallCompletion}%</p>
               <div className="mt-3 bg-indigo-400/30 rounded-full h-2">
                 <div
@@ -258,21 +278,30 @@ export default function RolloutPage() {
                 ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-amber-200'
                 : 'bg-gradient-to-br from-rose-500 to-rose-600 text-white shadow-rose-200'
             }`}>
-              <p className="text-white/80 text-sm font-medium">Failure Rate</p>
+              <p className="text-white/80 text-sm font-medium flex items-center">
+                Failure Rate
+                <Tooltip text="% of quality checks failing. Lower = better. Green when <5%." />
+              </p>
               <p className="text-4xl font-bold mt-1">{loading ? '...' : `${currentFailureRate}%`}</p>
               <p className="text-white/70 text-sm mt-1">Target: &lt;5%</p>
             </div>
 
             {/* Days Remaining */}
             <div className="bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl p-6 text-white shadow-lg shadow-slate-300">
-              <p className="text-slate-300 text-sm font-medium">Days to Launch</p>
+              <p className="text-slate-300 text-sm font-medium flex items-center">
+                Days to Launch
+                <Tooltip text="Countdown to customer presentations on Jan 30." />
+              </p>
               <p className="text-4xl font-bold mt-1">{daysRemaining}</p>
               <p className="text-slate-400 text-sm mt-1">Jan 30, 2026</p>
             </div>
 
             {/* ASINs Tested */}
             <div className="bg-gradient-to-br from-white to-slate-50 border-2 border-slate-200 rounded-xl p-6 shadow-lg">
-              <p className="text-slate-500 text-sm font-medium">ASINs Tested</p>
+              <p className="text-slate-500 text-sm font-medium flex items-center">
+                ASINs Tested
+                <Tooltip text="Products run through SLO pipeline for quality validation." />
+              </p>
               <p className="text-4xl font-bold text-slate-900 mt-1">{loading ? '...' : totalAsins}</p>
               <p className="text-slate-500 text-sm mt-1">19 categories</p>
             </div>
@@ -280,7 +309,10 @@ export default function RolloutPage() {
 
           {/* Failure Rate Progress */}
           <div className="bg-white rounded-xl border-2 border-slate-200 p-6 mb-8 shadow-md">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">Failure Rate Progress</h2>
+            <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+              Failure Rate Progress
+              <Tooltip text="Bug fixes reduce failure rate. Each bar shows target for that milestone." />
+            </h2>
             <p className="text-sm text-slate-500 mb-4">{failedChecks} failed checks out of {totalChecks} total</p>
             <div className="space-y-4">
               <div className="flex items-center gap-4">
@@ -322,7 +354,10 @@ export default function RolloutPage() {
 
           {/* Phase Timeline */}
           <div className="bg-white rounded-xl border-2 border-slate-200 p-6 mb-8 shadow-md">
-            <h2 className="text-lg font-semibold text-slate-900 mb-6">7-Day Rollout Timeline</h2>
+            <h2 className="text-lg font-semibold text-slate-900 mb-6 flex items-center">
+              7-Day Rollout Timeline
+              <Tooltip text="6 phases over 8 days. Yellow = in progress, green = done, blue = scheduled." />
+            </h2>
             <div className="space-y-4">
               {PHASES.map((phase, index) => (
                 <div
@@ -406,7 +441,10 @@ export default function RolloutPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-rose-900">Critical Blocker: M2 Data Fix</h3>
+                  <h3 className="font-semibold text-rose-900 flex items-center">
+                    Critical Blocker: M2 Data Fix
+                    <Tooltip text="Highest priority bug. Must be fixed before other work can proceed." />
+                  </h3>
                   <p className="text-sm text-rose-700 mt-1">
                     Missing competitors field causes cascading failures across M2.1, M2.3, M3, and M4.
                   </p>
@@ -423,7 +461,10 @@ export default function RolloutPage() {
 
             {/* Team Status */}
             <div className="bg-white border-2 border-slate-200 rounded-xl p-6 shadow-md">
-              <h3 className="font-semibold text-slate-900 mb-4">Team Status</h3>
+              <h3 className="font-semibold text-slate-900 mb-4 flex items-center">
+                Team Status
+                <Tooltip text="Active = working now. Standby = ready when needed." />
+              </h3>
               <div className="space-y-3">
                 {TEAM.map((member, i) => (
                   <div key={i} className="flex items-center justify-between">
