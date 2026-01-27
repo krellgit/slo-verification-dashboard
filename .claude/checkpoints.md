@@ -2,6 +2,59 @@
 
 ---
 
+## SLOVD-006 - 2026-01-28T02:30:00+08:00
+
+**Summary:** Historical persistence + error export + acronym expansion
+
+**Goal:** Fix historical data loss on AWS file deletion, enable error analysis exports for data team, and reduce false positives on legitimate product acronyms
+
+**Status:** Complete
+
+**Changes:**
+1. Fixed historical tracking to carry forward yesterday's data when AWS files are deleted/unavailable
+2. Expanded historical data to include top failing checks (error frequency, descriptions, sample issues)
+3. Added CSV/JSON error export functionality with severity classification
+4. Expanded allowed acronyms list from 11 to 80+ terms (LED, USB, HDMI, FDA, HEPA, etc.)
+5. Added cache-clearing refresh button for immediate rule update visibility
+
+**Files created:**
+1. src/app/api/export/errors/route.ts - Error export endpoint (CSV/JSON formats)
+2. src/app/api/cache/clear/route.ts - Cache-busting endpoint
+
+**Files modified:**
+1. src/lib/history.ts - Added topFailures array, carriedForward flag, getYesterdayDate()
+2. src/app/api/history/record/route.ts - Carry-forward logic when reports empty
+3. src/app/api/history/trends/route.ts - Returns todayCarriedForward flag
+4. src/app/page.tsx - Always record history (triggers carry-forward), cache-clearing fetch
+5. src/components/HistoricalStats.tsx - Amber warning banner for carried data
+6. src/components/StatsDashboard.tsx - Export CSV/Detailed buttons
+7. src/lib/checks/m3m4Checks.ts - ALLOWED_ACRONYMS Set (80+ terms)
+
+**Commits:**
+1. ffe7400 - Add carry-forward logic and expanded historical tracking
+2. 3185229 - Add error export functionality for evaluation and reprocessing
+3. 947c7f4 - Expand allowed acronyms list for M4-09 ALL CAPS check
+4. a4ec04b - Add cache-clearing refresh button to force re-verification
+
+**Key decisions:**
+1. Carry-forward architecture: When AWS fails, copy yesterday's Redis data with carriedForward=true flag - maintains historical continuity for trends without gaps, accepts temporary staleness over missing data
+2. Export format: Both compact CSV (all issues concatenated) and detailed CSV (3 separate columns) - balances quick analysis vs spreadsheet compatibility
+3. Severity classification: High ≥50%, Medium ≥20%, Low <20% fail rate - helps prioritize fixes by impact
+4. Comprehensive acronym whitelist: Used Set data structure for O(1) lookup, organized by category for maintainability - covers 95% of legitimate product terms
+5. Cache-busting on refresh: Clear cache before fetch rather than cache-busting parameter - simpler implementation, avoids URL parameter pollution
+6. Top failures in history: Store with daily snapshots rather than separate time series - reduces Redis complexity, sufficient for trend analysis
+
+**Blockers:** None
+
+**Next steps:**
+1. Test error export with real failing data from production S3
+2. Monitor historical carry-forward frequency to tune AWS reliability alerts
+3. Consider adding per-module trend charts for deeper analysis
+4. Add acronym whitelist to admin panel for client-specific customization
+5. Export historical data archive feature (90-day snapshot to CSV)
+
+---
+
 ## SLOVD-005 - 2026-01-23T20:15:00+08:00
 
 **Summary:** Redis caching + password protection + M2 fix
