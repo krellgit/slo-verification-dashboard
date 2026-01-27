@@ -7,6 +7,30 @@ import {
   DEFAULT_BANNED_TERMS,
 } from '../inputTypes';
 
+// Allowed ALL CAPS acronyms - legitimate brand/industry acronyms that should NOT be flagged
+// These are commonly used in product listings and are acceptable in uppercase form
+const ALLOWED_ACRONYMS = new Set([
+  // Technology / Electronics
+  'LED', 'LCD', 'OLED', 'HD', 'FHD', 'UHD', 'QHD', 'SD', 'SSD', 'HDD', 'NVMe',
+  'USB', 'HDMI', 'VGA', 'DVI', 'DP', 'RGB', 'CPU', 'GPU', 'RAM', 'ROM', 'DDR', 'SATA',
+  'PCIe', 'NFC', 'GPS', 'FM', 'AM', 'AC', 'DC', 'TV', 'PC', 'DVD', 'CD', 'MP3', 'MP4',
+  'AV', 'IR', 'RF', 'BT', 'LTE', 'WiFi', 'WIFI',
+  // Certifications / Standards
+  'FDA', 'EPA', 'FCC', 'CE', 'UL', 'ETL', 'CSA', 'ISO', 'USDA', 'NSF', 'ASTM', 'ANSI',
+  'RoHS', 'ROHS', 'BPA', 'VOC', 'CARB', 'DOT', 'OSHA', 'ADA', 'CPSC', 'IPX', 'IP',
+  // Materials / Chemistry
+  'PVC', 'ABS', 'PU', 'PE', 'PP', 'TPU', 'TPE', 'EVA', 'EPS', 'XPS', 'PTFE', 'HDPE', 'LDPE',
+  'UV', 'SPF', 'pH', 'PH',
+  // Industry / Product specific
+  'DIY', 'RV', 'SUV', 'ATV', 'UTV', 'OEM', 'CNC', 'CAD', 'CAM', 'ESD', 'EMI', 'EMC',
+  'HVAC', 'HEPA', 'MERV', 'CADR', 'CFU', 'PPM', 'TDS', 'EC',
+  // Roman numerals (common in product names)
+  'II', 'III', 'IV', 'VI', 'VII', 'VIII', 'IX', 'XI', 'XII', 'XV', 'XX',
+  // Common abbreviations
+  'USA', 'US', 'UK', 'EU', 'CA', 'AU', 'ID', 'OD', 'AWG', 'GA', 'SQ', 'HR', 'MIN', 'SEC',
+  'MAX', 'PRO', 'XL', 'XXL', 'XS', 'SM', 'MD', 'LG',
+]);
+
 // ============================================================================
 // M3: Keyword Intelligence Checks (8 checks)
 // ============================================================================
@@ -654,9 +678,8 @@ function checkM4_09(input: ListingCreationInput): CheckResult {
   const allCapsRegex = /\b[A-Z]{3,}\b/g;
   const matches = allContent.match(allCapsRegex) || [];
 
-  // Filter out common acceptable abbreviations
-  const acceptableAbbreviations = ['USB', 'LED', 'LCD', 'FDA', 'BPA', 'UV', 'AC', 'DC', 'HD', 'USA', 'UK'];
-  const violations = matches.filter((m) => !acceptableAbbreviations.includes(m));
+  // Filter out allowed acronyms (legitimate industry/brand abbreviations)
+  const violations = matches.filter((m) => !ALLOWED_ACRONYMS.has(m));
 
   if (violations.length === 0) {
     return {
@@ -677,7 +700,7 @@ function checkM4_09(input: ListingCreationInput): CheckResult {
     detail: `${uniqueViolations.length} ALL CAPS words found`,
     issue: {
       item: 'ALL CAPS violations',
-      expected: 'No words with 3+ consecutive uppercase letters',
+      expected: 'No words with 3+ consecutive uppercase letters (excluding allowed acronyms like LED, USB, HDMI)',
       actual: uniqueViolations.slice(0, 5).join(', '),
       reason: 'Amazon prohibits ALL CAPS words as they appear promotional',
     },
