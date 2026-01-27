@@ -60,11 +60,20 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   // Fetch reports from server
-  const fetchReports = useCallback(async () => {
+  const fetchReports = useCallback(async (clearCache = false) => {
     setLoadingState('loading');
     setErrorMessage(null);
 
     try {
+      // Clear cache if requested (for force refresh)
+      if (clearCache) {
+        try {
+          await fetch('/api/cache/clear', { method: 'POST' });
+        } catch (cacheErr) {
+          console.warn('Failed to clear cache:', cacheErr);
+        }
+      }
+
       const res = await fetch('/api/reports');
       const data: ReportsResponse = await res.json();
 
@@ -253,8 +262,9 @@ export default function Dashboard() {
             <div className="flex items-center gap-3">
               {loadingState === 'loaded' && (
                 <button
-                  onClick={fetchReports}
+                  onClick={() => fetchReports(true)}
                   className="px-4 py-2.5 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 font-medium shadow-md hover:shadow-lg flex items-center gap-2"
+                  title="Clear cache and reload data with latest verification rules"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -346,7 +356,7 @@ export default function Dashboard() {
               </h2>
               <p className="text-red-600 mb-4">{errorMessage}</p>
               <button
-                onClick={fetchReports}
+                onClick={() => fetchReports()}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
                 Retry
@@ -525,7 +535,7 @@ export default function Dashboard() {
                 The configured repository does not contain any JSON reports yet.
               </p>
               <button
-                onClick={fetchReports}
+                onClick={() => fetchReports()}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
               >
                 Refresh
