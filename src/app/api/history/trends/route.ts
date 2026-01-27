@@ -100,12 +100,18 @@ export async function GET(request: NextRequest) {
     // Calculate summary statistics
     const summary = calculateHistoricalSummary(trendData);
 
+    // Check if today's data is carried forward
+    const todayDate = new Date().toISOString().split('T')[0];
+    const todayStats = dailyStats.find(s => s.date === todayDate);
+    const todayCarriedForward = todayStats?.carriedForward || false;
+
     return NextResponse.json({
       trends: trendData,
       summary,
       dataPoints: trendData.length,
       daysRequested: days,
       asinFilter: asinFilter || null,
+      todayCarriedForward,
     });
   } catch (error) {
     console.error('[History Trends] Error:', error);

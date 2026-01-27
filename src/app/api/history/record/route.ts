@@ -1,8 +1,9 @@
 // POST /api/history/record
 // Records daily verification statistics for historical tracking
+// If AWS fails (empty reports), carries forward yesterday's data
 
 import { NextRequest, NextResponse } from 'next/server';
-import { calculateDailyStats, getDailyStatsKey, type DailyStats } from '@/lib/history';
+import { calculateDailyStats, getDailyStatsKey, getYesterdayDate, type DailyStats } from '@/lib/history';
 import { getRedisClient } from '@/lib/redis';
 
 // In-memory fallback (only for development/testing when Redis unavailable)
@@ -13,32 +14,32 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const { reports, date, force } = body;
-
-    if (!reports || !Array.isArray(reports)) {
-      return NextResponse.json(
-        { error: 'Invalid request: reports array required' },
-        { status: 400 }
-      );
-    }
-
-    // Calculate stats
-    const stats = calculateDailyStats(reports, date);
-    const key = getDailyStatsKey(stats.date);
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    const key = getDailyStatsKey(targetDate);
 
     // Store in Redis or fallback to memory
     const redis = getRedisClient();
 
     // Check if today's data already exists (skip if not forcing)
-    if (redis && !force) {
+    if (!force) {
       try {
-        const existing = await redis.get(key);
+        let existing: string | null = null;
+        if (redis) {
+          existing = await redis.get(key);
+        } else {
+          const memData = memoryStore.get(key);
+          existing = memData ? JSON.stringify(memData) : null;
+        }
+
         if (existing) {
+          const existingStats = JSON.parse(existing) as DailyStats;
           return NextResponse.json({
             success: true,
-            date: stats.date,
-            passRate: stats.passRate,
-            stored: 'redis',
+            date: targetDate,
+            passRate: existingStats.passRate,
+            stored: redis ? 'redis' : 'memory',
             skipped: true,
+            carriedForward: existingStats.carriedForward,
             message: 'Data already recorded for today',
           });
         }
@@ -47,6 +48,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let stats: DailyStats;
+    let carriedForward = false;
+
+    // If reports empty/null (AWS failed), carry forward yesterday's data
+    if (!reports || !Array.isArray(reports) || reports.length === 0) {
+      console.log('[History Record] No reports provided, attempting to carry forward yesterday\'s data');
+
+      const yesterdayDate = getYesterdayDate(targetDate);
+      const yesterdayKey = getDailyStatsKey(yesterdayDate);
+
+      let yesterdayData: string | null = null;
+      if (redis) {
+        yesterdayData = await redis.get(yesterdayKey);
+      } else {
+        const memData = memoryStore.get(yesterdayKey);
+        yesterdayData = memData ? JSON.stringify(memData) : null;
+      }
+
+      if (yesterdayData) {
+        const yesterdayStats = JSON.parse(yesterdayData) as DailyStats;
+        stats = {
+          ...yesterdayStats,
+          date: targetDate,
+          timestamp: new Date().toISOString(),
+          carriedForward: true,
+        };
+        carriedForward = true;
+        console.log(`[History Record] Carried forward data from ${yesterdayDate}`);
+      } else {
+        return NextResponse.json({
+          success: false,
+          error: 'No reports provided and no previous data to carry forward',
+        }, { status: 400 });
+      }
+    } else {
+      // Calculate stats from provided reports
+      stats = calculateDailyStats(reports, targetDate);
+    }
+
+    // Store the data
     if (redis) {
       await redis.set(key, JSON.stringify(stats));
       // Set 90-day expiration
@@ -61,6 +102,7 @@ export async function POST(request: NextRequest) {
       passRate: stats.passRate,
       stored: redis ? 'redis' : 'memory',
       skipped: false,
+      carriedForward,
     });
   } catch (error) {
     console.error('[History Record] Error:', error);

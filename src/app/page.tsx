@@ -71,12 +71,32 @@ export default function Dashboard() {
       if (!data.configured) {
         setLoadingState('not_configured');
         setErrorMessage(data.error || 'Dashboard not configured');
+        // Still try to record historical data (will carry forward if possible)
+        try {
+          await fetch('/api/history/record', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reports: [] }),
+          });
+        } catch (err) {
+          console.warn('Failed to record historical data:', err);
+        }
         return;
       }
 
       if (data.error) {
         setLoadingState('error');
         setErrorMessage(data.error);
+        // Still try to record historical data (will carry forward if possible)
+        try {
+          await fetch('/api/history/record', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reports: [] }),
+          });
+        } catch (err) {
+          console.warn('Failed to record historical data:', err);
+        }
         return;
       }
 
@@ -85,17 +105,15 @@ export default function Dashboard() {
       setLastUpdated(data.meta?.timestamp || new Date().toISOString());
       setLoadingState('loaded');
 
-      // Record historical data
-      if (data.reports && data.reports.length > 0) {
-        try {
-          await fetch('/api/history/record', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reports: data.reports }),
-          });
-        } catch (err) {
-          console.warn('Failed to record historical data:', err);
-        }
+      // Record historical data (always attempt, even if empty - will carry forward yesterday's data)
+      try {
+        await fetch('/api/history/record', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reports: data.reports || [] }),
+        });
+      } catch (err) {
+        console.warn('Failed to record historical data:', err);
       }
 
       // Auto-select first ASIN if available

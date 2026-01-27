@@ -1,7 +1,8 @@
 // Historical Pass Rate Tracking Library
-// Uses Vercel KV for storing daily verification statistics
+// Uses Redis for storing daily verification statistics
 
 import { VerificationResult } from './types';
+import { getTopFailures } from './statsAggregator';
 
 export interface DailyStats {
   date: string; // YYYY-MM-DD format
@@ -32,6 +33,19 @@ export interface DailyStats {
     passed: number;
     total: number;
   }>;
+
+  // Top failing checks (for error pattern analysis)
+  topFailures: Array<{
+    checkId: string;
+    checkName: string;
+    moduleName: string;
+    failCount: number;
+    failRate: number;
+    sampleIssues: string[];
+  }>;
+
+  // Metadata
+  carriedForward?: boolean; // true if this data was copied from previous day
 }
 
 export interface TrendDataPoint {
@@ -105,6 +119,9 @@ export function calculateDailyStats(
     return acc;
   }, {} as DailyStats['moduleStats']);
 
+  // Calculate top failures
+  const topFailures = getTopFailures(reports, 10);
+
   return {
     date: statsDate,
     timestamp: new Date().toISOString(),
@@ -116,6 +133,7 @@ export function calculateDailyStats(
     passRate: totalChecks > 0 ? Math.round((passedChecks / totalChecks) * 100) : 0,
     moduleStats,
     asinStats,
+    topFailures,
   };
 }
 
@@ -209,4 +227,13 @@ export function getDateRangeKeys(days: number): string[] {
   }
 
   return keys;
+}
+
+/**
+ * Get yesterday's date in YYYY-MM-DD format
+ */
+export function getYesterdayDate(fromDate?: string): string {
+  const date = fromDate ? new Date(fromDate) : new Date();
+  date.setDate(date.getDate() - 1);
+  return date.toISOString().split('T')[0];
 }
